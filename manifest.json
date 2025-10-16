@@ -1,8 +1,12 @@
 {
   "name": "nosubvod-twitch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Show sub-only VOD on Twitch",
   "manifest_version": 3,
+  "action": {
+    "default_title": "NoSubVod Twitch",
+    "default_popup": "popup.html"
+  },
   "icons": {
     "128": "assets/icons/icon.png"
   },
@@ -32,7 +36,12 @@
   ],
   "host_permissions": [
     "https://*.twitch.tv/*",
-    "https://static.twitchcdn.net/assets/*"
+    "https://static.twitchcdn.net/assets/*",
+    "https://gql.twitch.tv/*",
+    "https://*.cloudfront.net/*"
   ],
-  "permissions": []
+  "permissions": [
+    "tabs",
+    "downloads"
+  ]
 }

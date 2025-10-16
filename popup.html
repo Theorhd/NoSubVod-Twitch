@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NoSubVod</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 12px; width: 320px; color: #e3e3e3; background: #0e0e10; }
+      header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+      h1 { font-size: 16px; margin: 0; }
+      .vod-info { font-size: 12px; line-height: 1.4; margin-bottom: 10px; color: #cfcfcf; }
+      .row { display: flex; justify-content: space-between; gap: 8px; margin: 6px 0; }
+      .label { color: #adadb8; }
+      button { width: 100%; padding: 8px 10px; background: #9146FF; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+      button[disabled] { opacity: 0.6; cursor: default; }
+      .error { color: #ff8484; font-size: 12px; }
+      .muted { color: #adadb8; }
+      select, input[type="text"] { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #2f2f37; background: #18181b; color: #e3e3e3; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="assets/icons/icon.png" alt="icon" width="20" height="20">
+      <h1>NoSubVod Twitch</h1>
+    </header>
+    <div id="status" class="muted">Chargement des infos VOD…</div>
+    <div id="content" style="display:none">
+      <div class="vod-info">
+        <div class="row"><span class="label">Chaîne</span><span id="channel">—</span></div>
+        <div class="row"><span class="label">Titre</span><span id="title">—</span></div>
+        <div class="row"><span class="label">Type</span><span id="type">—</span></div>
+        <div class="row"><span class="label">Créée</span><span id="created">—</span></div>
+        <div class="row"><span class="label">VOD ID</span><span id="vodId">—</span></div>
+      </div>
+      <div class="row">
+        <select id="quality"></select>
+      </div>
+      <div class="row">
+        <button id="downloadBtn" disabled>Télécharger la VOD (.ts)</button>
+      </div>
+      <div class="row">
+        <input id="customUrl" type="text" placeholder="Ou collez une URL vidéo directe…">
+      </div>
+      <div class="row">
+        <button id="downloadDirect">Télécharger la vidéo</button>
+      </div>
+      <div class="error" id="error"></div>
+    </div>
+    <script src="dist/popup.js"></script>
+  </body>
+</html>
