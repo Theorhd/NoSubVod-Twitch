@@ -47,6 +47,7 @@
     "tabs",
     "downloads",
     "storage",
-    "notifications"
+    "notifications",
+    "declarativeContent"
   ]
 }

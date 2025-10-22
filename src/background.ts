@@ -423,4 +423,69 @@ async function handleFileWriteError(request: any) {
   }).catch(() => {});
 }
 
+// Highlight extension icon when on Twitch pages with more visible indicators
+function updateExtensionVisibility(tabId: number, url: string) {
+  const isTwitchPage = /^https?:\/\/(www\.)?twitch\.tv\//.test(url);
+  
+  if (isTwitchPage) {
+    // Show prominent badge
+    chrome.action.setBadgeText({ text: 'ON', tabId });
+    chrome.action.setBadgeBackgroundColor({ color: '#00FF00', tabId }); // Bright green for visibility
+    chrome.action.setTitle({ 
+      title: '✓ NoSubVod Twitch - ACTIF\nCliquez pour télécharger des VODs', 
+      tabId 
+    });
+    // Enable the action
+    chrome.action.enable(tabId);
+  } else {
+    // Less prominent on non-Twitch pages
+    chrome.action.setBadgeText({ text: '', tabId });
+    chrome.action.setTitle({ title: 'NoSubVod Twitch\n(Visitez twitch.tv pour activer)', tabId });
+    // Keep enabled but without badge
+    chrome.action.enable(tabId);
+  }
+}
+
+// Listen for tab updates
+chrome.tabs.onUpdated.addListener((tabId: number, changeInfo: any, tab: any) => {
+  // Update on any URL change, not just when complete
+  if (tab.url && (changeInfo.status === 'complete' || changeInfo.url)) {
+    updateExtensionVisibility(tabId, tab.url);
+  }
+});
+
+// Listen for tab activation (when user switches tabs)
+chrome.tabs.onActivated.addListener((activeInfo: any) => {
+  chrome.tabs.get(activeInfo.tabId, (tab: any) => {
+    if (tab.url) {
+      updateExtensionVisibility(activeInfo.tabId, tab.url);
+    }
+  });
+});
+
+// Handle existing tabs when extension loads/reloads
+chrome.tabs.query({}, (tabs: any[]) => {
+  tabs.forEach((tab: any) => {
+    if (tab.id && tab.url) {
+      updateExtensionVisibility(tab.id, tab.url);
+    }
+  });
+});
+
+// Use declarativeContent to show page action on Twitch
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.declarativeContent.onPageChanged.removeRules(undefined, () => {
+    chrome.declarativeContent.onPageChanged.addRules([
+      {
+        conditions: [
+          new chrome.declarativeContent.PageStateMatcher({
+            pageUrl: { hostSuffix: 'twitch.tv' }
+          })
+        ],
+        actions: [new chrome.declarativeContent.ShowAction()]
+      }
+    ]);
+  });
+});
+
 console.log('[NoSubVod] Background service worker loaded');
