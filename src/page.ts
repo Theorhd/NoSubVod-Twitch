@@ -22,7 +22,7 @@
         const blob = new Blob([content], { type: 'application/javascript' });
         finalUrl = URL.createObjectURL(blob);
       } catch (e) {
-        console.error('[TNS] Worker patch failed', e);
+        console.error('[NSV] Worker patch failed', e);
       }
       super(finalUrl);
     }

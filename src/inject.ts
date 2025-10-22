@@ -1,4 +1,4 @@
-// Page-context script injected via twitchnosub.ts
+// Page-context script injected via nosubvod.ts
 (function() {
   // Only apply on VOD pages
   if (!window.location.pathname.includes('/videos/')) return;
@@ -30,7 +30,7 @@
         const blob = new Blob([blobContent], { type: 'application/javascript' });
         workerUrl = URL.createObjectURL(blob);
       } catch (err) {
-        console.error('[TNS] Worker patch failed', err);
+        console.error('[NSV] Worker patch failed', err);
       }
       super(workerUrl);
     }

@@ -1,11 +1,14 @@
 {
   "name": "nosubvod-twitch",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Show sub-only VOD on Twitch",
   "manifest_version": 3,
   "action": {
     "default_title": "NoSubVod Twitch",
     "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "dist/background.js"
   },
   "icons": {
     "128": "assets/icons/icon.png"
@@ -42,6 +45,8 @@
   ],
   "permissions": [
     "tabs",
-    "downloads"
+    "downloads",
+    "storage",
+    "notifications"
   ]
 }

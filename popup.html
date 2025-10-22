@@ -5,47 +5,242 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>NoSubVod</title>
     <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 12px; width: 320px; color: #e3e3e3; background: #0e0e10; }
-      header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+      * { box-sizing: border-box; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 0; width: 420px; color: #e3e3e3; background: #0e0e10; }
+      
+      header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid #2f2f37; }
+      .header-left { display: flex; align-items: center; gap: 8px; }
       h1 { font-size: 16px; margin: 0; }
+      
+      /* Tabs */
+      .tabs { display: flex; border-bottom: 1px solid #2f2f37; background: #18181b; }
+      .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; border: none; background: none; color: #adadb8; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+      .tab:hover { background: #1f1f23; color: #e3e3e3; }
+      .tab.active { color: #9146FF; border-bottom: 2px solid #9146FF; }
+      
+      /* Tab content */
+      .tab-content { display: none; padding: 12px; max-height: 500px; overflow-y: auto; }
+      .tab-content.active { display: block; }
+      
+      /* Download tab */
       .vod-info { font-size: 12px; line-height: 1.4; margin-bottom: 10px; color: #cfcfcf; }
+      .thumbnail { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; }
+      .thumbnail.hidden { display: none; }
       .row { display: flex; justify-content: space-between; gap: 8px; margin: 6px 0; }
-      .label { color: #adadb8; }
-      button { width: 100%; padding: 8px 10px; background: #9146FF; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
-      button[disabled] { opacity: 0.6; cursor: default; }
-      .error { color: #ff8484; font-size: 12px; }
-      .muted { color: #adadb8; }
-      select, input[type="text"] { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #2f2f37; background: #18181b; color: #e3e3e3; }
+      .label { color: #adadb8; font-weight: 500; }
+      
+      /* Progress bar */
+      .progress-container { background: #18181b; border-radius: 8px; padding: 10px; margin: 10px 0; display: none; }
+      .progress-container.visible { display: block; }
+      .progress-bar { width: 100%; height: 8px; background: #2f2f37; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+      .progress-fill { height: 100%; background: linear-gradient(90deg, #9146FF, #b366ff); transition: width 0.3s; }
+      .progress-stats { font-size: 11px; color: #adadb8; display: flex; justify-content: space-between; }
+      .progress-percent { font-weight: 600; color: #9146FF; }
+      
+      /* Buttons */
+      button { width: 100%; padding: 8px 10px; background: #9146FF; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: background 0.2s; }
+      button:hover { background: #a45fff; }
+      button[disabled] { opacity: 0.6; cursor: default; background: #9146FF; }
+      button.secondary { background: #2f2f37; }
+      button.secondary:hover { background: #3a3a42; }
+      
+      /* Input fields */
+      select, input[type="text"], input[type="number"] { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #2f2f37; background: #18181b; color: #e3e3e3; font-size: 13px; }
+      select:focus, input:focus { outline: none; border-color: #9146FF; }
+      
+      /* Messages */
+      .error { color: #ff8484; font-size: 12px; margin-top: 8px; }
+      .success { color: #4caf50; font-size: 12px; margin-top: 8px; }
+      .muted { color: #adadb8; font-size: 13px; }
+      
+      /* History */
+      .history-item { background: #18181b; border-radius: 8px; padding: 10px; margin-bottom: 8px; cursor: pointer; transition: background 0.2s; }
+      .history-item:hover { background: #1f1f23; }
+      .history-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .history-thumb { width: 60px; height: 34px; object-fit: cover; border-radius: 4px; }
+      .history-info { flex: 1; }
+      .history-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .history-meta { font-size: 11px; color: #adadb8; }
+      .history-empty { text-align: center; padding: 40px 20px; color: #adadb8; }
+      .clear-history { margin-top: 10px; }
+      
+      /* Settings */
+      .setting-group { margin-bottom: 20px; }
+      .setting-group h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #adadb8; text-transform: uppercase; }
+      .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+      .setting-label { font-size: 13px; }
+      .setting-desc { font-size: 11px; color: #adadb8; margin-top: 2px; }
+      
+      /* Toggle switch */
+      .toggle { position: relative; width: 44px; height: 24px; }
+      .toggle input { opacity: 0; width: 0; height: 0; }
+      .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #2f2f37; border-radius: 24px; transition: 0.3s; }
+      .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+      .toggle input:checked + .toggle-slider { background: #9146FF; }
+      .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
+      
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #18181b; }
+      ::-webkit-scrollbar-thumb { background: #2f2f37; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
     </style>
   </head>
   <body>
     <header>
-      <img src="assets/icons/icon.png" alt="icon" width="20" height="20">
-      <h1>NoSubVod Twitch</h1>
+      <div class="header-left">
+        <img src="assets/icons/icon.png" alt="icon" width="20" height="20">
+        <h1>NoSubVod Twitch</h1>
+      </div>
+      <span id="version" class="muted" style="font-size: 11px;">v0.3.0</span>
     </header>
-    <div id="status" class="muted">Chargement des infos VOD…</div>
-    <div id="content" style="display:none">
-      <div class="vod-info">
-        <div class="row"><span class="label">Chaîne</span><span id="channel">—</span></div>
-        <div class="row"><span class="label">Titre</span><span id="title">—</span></div>
-        <div class="row"><span class="label">Type</span><span id="type">—</span></div>
-        <div class="row"><span class="label">Créée</span><span id="created">—</span></div>
-        <div class="row"><span class="label">VOD ID</span><span id="vodId">—</span></div>
-      </div>
-      <div class="row">
-        <select id="quality"></select>
-      </div>
-      <div class="row">
-        <button id="downloadBtn" disabled>Télécharger la VOD (.ts)</button>
-      </div>
-      <div class="row">
-        <input id="customUrl" type="text" placeholder="Ou collez une URL vidéo directe…">
-      </div>
-      <div class="row">
-        <button id="downloadDirect">Télécharger la vidéo</button>
-      </div>
-      <div class="error" id="error"></div>
+    
+    <div class="tabs">
+      <button class="tab active" data-tab="download">Télécharger</button>
+      <button class="tab" data-tab="history">Historique</button>
+      <button class="tab" data-tab="settings">Paramètres</button>
     </div>
+    
+    <!-- Download Tab -->
+    <div class="tab-content active" id="download-tab">
+      <div id="status" class="muted">Chargement des infos VOD…</div>
+      <div id="content" style="display:none">
+        <img id="thumbnail" class="thumbnail hidden" alt="VOD thumbnail">
+        <div class="vod-info">
+          <div class="row"><span class="label">Chaîne</span><span id="channel">—</span></div>
+          <div class="row"><span class="label">Titre</span><span id="title">—</span></div>
+          <div class="row"><span class="label">Type</span><span id="type">—</span></div>
+          <div class="row"><span class="label">Créée</span><span id="created">—</span></div>
+          <div class="row"><span class="label">VOD ID</span><span id="vodId">—</span></div>
+        </div>
+        
+        <div class="progress-container" id="progressContainer">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+          </div>
+          <div class="progress-stats">
+            <span><span class="progress-percent" id="progressPercent">0%</span> • <span id="progressSegments">0/0</span></span>
+            <span id="progressSpeed">0 KB/s</span>
+          </div>
+          <div class="progress-stats" style="margin-top: 4px;">
+            <span id="progressTime">Temps restant: —</span>
+            <span id="progressSize">0 MB</span>
+          </div>
+          <button id="cancelDownload" class="secondary" style="margin-top: 10px;">❌ Annuler le téléchargement</button>
+          <button id="pauseDownload" class="secondary" style="margin-top: 10px;">⏸️ Mettre en pause</button>
+          <button id="resumeDownload" class="secondary" style="margin-top: 10px; display:none;">▶️ Reprendre</button>
+        </div>
+        
+        <div class="row">
+          <input id="startTime" type="text" placeholder="Début (hh:mm:ss)" style="width:48%; margin-right:4%;">
+          <input id="endTime" type="text" placeholder="Fin (hh:mm:ss)" style="width:48%;">
+        </div>
+        <div class="row">
+          <select id="quality"></select>
+        </div>
+        <div class="row">
+          <button id="downloadBtn" disabled>Télécharger la VOD (.ts)</button>
+        </div>
+        <div class="row">
+          <input id="customUrl" type="text" placeholder="Ou collez une URL vidéo directe…">
+        </div>
+        <div class="row">
+          <button id="downloadDirect" class="secondary">Télécharger la vidéo</button>
+        </div>
+        <div class="error" id="error"></div>
+        <div class="success" id="success"></div>
+      </div>
+    </div>
+    
+    <!-- History Tab -->
+    <div class="tab-content" id="history-tab">
+      <div id="historyList">
+        <div class="history-empty">
+          <p>📦 Aucun téléchargement pour le moment</p>
+          <p class="muted" style="font-size: 11px;">Vos téléchargements apparaîtront ici</p>
+        </div>
+      </div>
+      <button id="clearHistory" class="clear-history secondary" style="display: none;">Effacer l'historique</button>
+    </div>
+    
+    <!-- Settings Tab -->
+    <div class="tab-content" id="settings-tab">
+      <div class="setting-group">
+        <h3>🎬 Téléchargement</h3>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Qualité par défaut</div>
+            <div class="setting-desc">Qualité présélectionnée</div>
+          </div>
+          <select id="settingDefaultQuality" style="width: 120px;">
+            <option value="Source">Source</option>
+            <option value="1080p60">1080p60</option>
+            <option value="720p60">720p60</option>
+            <option value="480p30">480p30</option>
+            <option value="360p30">360p30</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Segments parallèles</div>
+            <div class="setting-desc">Nombre de segments téléchargés simultanément</div>
+          </div>
+          <input id="settingChunkSize" type="number" min="1" max="10" value="5" style="width: 60px;">
+        </div>
+      </div>
+      
+      <div class="setting-group">
+        <h3>🔔 Notifications</h3>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Activer les notifications</div>
+            <div class="setting-desc">Recevoir une notification à la fin du téléchargement</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="settingNotifications" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="setting-group">
+        <h3>🖼️ Interface</h3>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Afficher les miniatures</div>
+            <div class="setting-desc">Afficher les thumbnails des VODs</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="settingThumbnails" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="setting-group">
+        <h3>🗂️ Historique</h3>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Nombre max d'éléments</div>
+            <div class="setting-desc">Limite de l'historique</div>
+          </div>
+          <input id="settingMaxHistory" type="number" min="10" max="500" value="100" style="width: 60px;">
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Nettoyage auto (jours)</div>
+            <div class="setting-desc">Supprimer après X jours (0 = désactivé)</div>
+          </div>
+          <input id="settingAutoCleanup" type="number" min="0" max="365" value="30" style="width: 60px;">
+        </div>
+      </div>
+      
+      <div class="row">
+        <button id="saveSettings">💾 Enregistrer les paramètres</button>
+      </div>
+      <div class="success" id="settingsSuccess"></div>
+    </div>
+    
     <script src="dist/popup.js"></script>
   </body>
 </html>

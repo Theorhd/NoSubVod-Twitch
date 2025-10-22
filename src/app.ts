@@ -20,13 +20,13 @@ try {
         const blob = new Blob([blobContent], { type: 'application/javascript' });
         workerUrl = URL.createObjectURL(blob);
       } catch (err) {
-        console.error('[TNS] Worker patch failed, using original URL', err);
+        console.error('[NSV] Worker patch failed, using original URL', err);
       }
       super(workerUrl);
     }
   };
 } catch (e) {
-  console.error('[TNS] Worker override setup failed', e);
+  console.error('[NSV] Worker override setup failed', e);
 }
 
 export {};
