@@ -1,6 +1,7 @@
 declare const chrome: any;
 
 import { storage, VodDownload, Settings, ActiveDownload } from './storage';
+import { badgeManager, Badge, PRESET_BADGES } from './badge-manager';
 
 // Util: current active tab URL
 async function getActiveTabUrl(): Promise<string | null> {
@@ -669,4 +670,150 @@ async function init(): Promise<void> {
   }
 }
 
+// Badge Manager Handler
+async function setupBadgeManager() {
+  const badgePresetsContainer = document.getElementById('badgePresets') as HTMLElement;
+  const badgeImportedContainer = document.getElementById('badgeImported') as HTMLElement;
+  const badgeImportBtn = document.getElementById('badgeImportBtn') as HTMLButtonElement;
+  const badgeFileInput = document.getElementById('badgeFileInput') as HTMLInputElement;
+  const badgeInput = document.getElementById('chatMyBadge') as HTMLInputElement;
+  const badgeNameInput = document.getElementById('chatBadgeName') as HTMLInputElement;
+
+  let selectedBadge: Badge | null = null;
+
+  // Fonction pour afficher un badge
+  const createBadgeButton = (badge: Badge, container: HTMLElement, isSelected: boolean = false) => {
+    const btn = document.createElement('button');
+    btn.className = `badge-btn${isSelected ? ' selected' : ''}`;
+    btn.type = 'button';
+    
+    if (badge.type === 'imported' && badge.content.startsWith('data:')) {
+      // Image importée
+      const img = document.createElement('img');
+      img.src = badge.content;
+      btn.appendChild(img);
+    } else {
+      // Emoji ou texte
+      btn.textContent = badge.content;
+    }
+
+    btn.title = badge.name;
+    
+    btn.addEventListener('click', () => {
+      // Désélectionner le précédent
+      container.querySelectorAll('.badge-btn.selected').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedBadge = badge;
+      badgeInput.value = badge.content;
+      badgeNameInput.value = badge.name; // Auto-fill le nom du badge
+    });
+
+    container.appendChild(btn);
+  };
+
+  // Charger les badges prédéfinis
+  const badges = await badgeManager.getAllBadges();
+  const presets = badges.filter(b => b.type !== 'imported');
+  const imported = badges.filter(b => b.type === 'imported');
+
+  presets.forEach(badge => {
+    createBadgeButton(badge, badgePresetsContainer);
+  });
+
+  imported.forEach(badge => {
+    createBadgeButton(badge, badgeImportedContainer);
+  });
+
+  // Gérer l'import de badges
+  badgeImportBtn.addEventListener('click', () => {
+    badgeFileInput.click();
+  });
+
+  badgeFileInput.addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    try {
+      badgeImportBtn.disabled = true;
+      badgeImportBtn.textContent = '⏳ Import en cours...';
+
+      const badge = await badgeManager.importBadge(file);
+      
+      // Ajouter le nouveau badge à l'interface
+      createBadgeButton(badge, badgeImportedContainer, true);
+      selectedBadge = badge;
+      badgeInput.value = badge.content;
+      badgeNameInput.value = badge.name; // Auto-fill le nom du badge
+
+      badgeImportBtn.disabled = false;
+      badgeImportBtn.textContent = '➕ Importer un Badge';
+      badgeFileInput.value = '';
+    } catch (err) {
+      console.error('[NSV] Badge import error:', err);
+      badgeImportBtn.disabled = false;
+      badgeImportBtn.textContent = '➕ Importer un Badge';
+      alert('Erreur lors de l\'import du badge');
+    }
+  });
+}
+
+// Chat Customization Handler
+function setupChatCustomization() {
+  const badgeInput = document.getElementById('chatMyBadge') as HTMLInputElement;
+  const badgeNameInput = document.getElementById('chatBadgeName') as HTMLInputElement;
+  const effectSelect = document.getElementById('chatMyEffect') as HTMLSelectElement;
+  const applyBtn = document.getElementById('chatApplyCustomization') as HTMLButtonElement;
+  const successMsg = document.getElementById('chatCustomizationSuccess') as HTMLElement;
+
+  // Load saved settings
+  chrome.storage.sync.get('chatCustomization', (result: any) => {
+    if (result.chatCustomization) {
+      badgeInput.value = result.chatCustomization.myBadgeText || '';
+      badgeNameInput.value = result.chatCustomization.myBadgeName || '';
+      effectSelect.value = result.chatCustomization.myEffect || '';
+    }
+  });
+
+  // Apply customization
+  applyBtn.addEventListener('click', () => {
+    const badgeText = badgeInput.value.trim();
+    const badgeName = badgeNameInput.value.trim();
+    const effectType = effectSelect.value;
+
+    const settings: any = {
+      enableMyBadge: badgeText.length > 0,
+      myBadgeText: badgeText,
+      myBadgeName: badgeName,
+      enableMyEffect: effectType.length > 0,
+      myEffect: effectType
+    };
+
+    chrome.storage.sync.set({ chatCustomization: settings }, () => {
+      successMsg.textContent = '✅ Personnalisation enregistrée !';
+      successMsg.style.color = '#4caf50';
+      setTimeout(() => {
+        successMsg.textContent = '';
+      }, 3000);
+
+      // Notify all tabs to update
+      chrome.tabs.query({}, (tabs: any[]) => {
+        tabs.forEach((tab: any) => {
+          // Filtrer seulement les onglets Twitch
+          if (tab.url && tab.url.includes('twitch.tv')) {
+            chrome.tabs.sendMessage(tab.id, { type: 'CHAT_CUSTOMIZATION_UPDATED', settings }, (response: any) => {
+              // Vérifier et ignorer silencieusement les erreurs
+              if (chrome.runtime.lastError) {
+                // L'onglet n'a pas le content script, c'est normal
+                return;
+              }
+            });
+          }
+        });
+      });
+    });
+  });
+}
+
 init();
+setupBadgeManager();
+setupChatCustomization();

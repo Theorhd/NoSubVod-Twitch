@@ -3,8 +3,8 @@
   "version": "0.3.0",
   "description": "Show sub-only VOD on Twitch (TypeScript version)",
   "scripts": {
-    "build": "esbuild src/page_init.ts src/app.ts src/patch_amazonworker.ts src/inject.ts src/nosubvod.ts src/restriction-remover.ts src/popup.ts src/background.ts src/download.ts --bundle --outdir=dist --platform=browser --format=iife --minify",
-    "watch": "esbuild src/page_init.ts src/app.ts src/patch_amazonworker.ts src/inject.ts src/nosubvod.ts src/restriction-remover.ts src/popup.ts src/background.ts src/download.ts --bundle --outdir=dist --platform=browser --format=iife --watch",
+    "build": "esbuild src/page_init.ts src/app.ts src/patch_amazonworker.ts src/inject.ts src/nosubvod.ts src/restriction-remover.ts src/chat-customizer-bridge.ts src/InterfaceChange.ts src/ChatCustomizer.ts src/popup.ts src/background.ts src/download.ts --bundle --outdir=dist --platform=browser --format=iife --minify",
+    "watch": "esbuild src/page_init.ts src/app.ts src/patch_amazonworker.ts src/inject.ts src/nosubvod.ts src/restriction-remover.ts src/chat-customizer-bridge.ts src/InterfaceChange.ts src/ChatCustomizer.ts src/popup.ts src/background.ts src/download.ts --bundle --outdir=dist --platform=browser --format=iife --watch",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

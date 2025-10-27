@@ -84,6 +84,25 @@
       ::-webkit-scrollbar-track { background: #18181b; }
       ::-webkit-scrollbar-thumb { background: #2f2f37; border-radius: 4px; }
       ::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
+      
+      /* Badge styles */
+      .badge-btn { 
+        width: 100%; 
+        padding: 10px; 
+        background: #2f2f37; 
+        border: 2px solid transparent; 
+        border-radius: 6px; 
+        cursor: pointer; 
+        font-size: 20px; 
+        transition: all 0.2s; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 50px;
+      }
+      .badge-btn:hover { background: #3a3a42; border-color: #9146FF; }
+      .badge-btn.selected { border-color: #9146FF; background: #1a1f2e; }
+      .badge-btn img { max-width: 100%; max-height: 40px; object-fit: contain; }
     </style>
   </head>
   <body>
@@ -215,6 +234,76 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+      </div>
+
+      <div class="setting-group">
+        <h3>💬 Personnalisation du Pseudo</h3>
+        
+        <!-- Badge Selection -->
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Sélectionner un Badge</div>
+            <div class="setting-desc">Choisir parmi les badges prédéfinis ou vos imports</div>
+          </div>
+        </div>
+        
+        <!-- Predefined Badges -->
+        <div style="margin-bottom: 12px;">
+          <div class="setting-desc" style="margin-bottom: 8px;">📌 Badges Prédéfinis</div>
+          <div id="badgePresets" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;">
+            <!-- Badges prédéfinis seront ajoutés ici par JS -->
+          </div>
+        </div>
+        
+        <!-- Imported Badges -->
+        <div style="margin-bottom: 12px;">
+          <div class="setting-desc" style="margin-bottom: 8px;">🎨 Vos Badges Importés</div>
+          <div id="badgeImported" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;">
+            <!-- Badges importés seront ajoutés ici par JS -->
+          </div>
+          <button id="badgeImportBtn" class="secondary" style="margin-bottom: 12px;">➕ Importer un Badge</button>
+          <input type="file" id="badgeFileInput" accept="image/*" style="display: none;">
+        </div>
+        
+        <!-- Custom Badge Text -->
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Badge Personnalisé</div>
+            <div class="setting-desc">Ou entrez du texte/emoji personnalisé</div>
+          </div>
+        </div>
+        <input id="chatMyBadge" type="text" placeholder="Ex: 👑 ou [VIP]" style="margin-bottom: 6px;">
+        
+        <!-- Badge Name/Tooltip -->
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Nom du Badge (Tooltip)</div>
+            <div class="setting-desc">Nom qui s'affichera au survol du badge</div>
+          </div>
+        </div>
+        <input id="chatBadgeName" type="text" placeholder="Ex: ZEVENT 2024" style="margin-bottom: 12px;">
+        
+        <!-- Effect Selection -->
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Effet de Mon Pseudo</div>
+            <div class="setting-desc">Effet visuel appliqué à votre pseudo dans le chat</div>
+          </div>
+        </div>
+        <select id="chatMyEffect" style="margin-bottom: 12px;">
+          <option value="">Aucun effet</option>
+          <option value="rainbow">🌈 Arc-en-ciel</option>
+          <option value="gradient_purple">💜 Dégradé Violet</option>
+          <option value="gradient_ocean">💙 Dégradé Océan</option>
+          <option value="gradient_fire">🔥 Dégradé Feu</option>
+          <option value="gradient_sunset">🌅 Dégradé Coucher de Soleil</option>
+          <option value="glitch">⚡ Glitch</option>
+          <option value="neon_blue">💎 Néon Bleu</option>
+          <option value="neon_pink">💖 Néon Rose</option>
+        </select>
+        
+        <button id="chatApplyCustomization">✨ Appliquer la personnalisation</button>
+        <div class="success" id="chatCustomizationSuccess"></div>
       </div>
       
       <div class="setting-group">
