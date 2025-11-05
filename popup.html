@@ -111,7 +111,7 @@
         <img src="assets/icons/icon.png" alt="icon" width="20" height="20">
         <h1>NoSubVod Twitch</h1>
       </div>
-      <span id="version" class="muted" style="font-size: 11px;">v0.3.0</span>
+      <span id="version" class="muted" style="font-size: 11px;">v1.0.0</span>
     </header>
     
     <div class="tabs">
@@ -321,6 +321,25 @@
             <div class="setting-desc">Supprimer après X jours (0 = désactivé)</div>
           </div>
           <input id="settingAutoCleanup" type="number" min="0" max="365" value="30" style="width: 60px;">
+        </div>
+      </div>
+      
+      <div class="setting-group">
+        <h3>🔧 Développeur</h3>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Mode développeur</div>
+            <div class="setting-desc">Active le logging avancé de toutes les requêtes</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="settingDeveloperMode">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-desc" style="margin-top: 8px; font-size: 11px;">
+          Lorsque activé, toutes les requêtes HTTP seront enregistrées.<br>
+          Pour télécharger les logs, tapez dans la console:<br>
+          <code style="background: #18181b; padding: 2px 6px; border-radius: 4px;">NoSubVodLogger.downloadLogs()</code>
         </div>
       </div>
       

@@ -1,4 +1,18 @@
 // Patch Amazon IVS worker to override fetch and serve sub-only VOD streams
+console.log('[NSV Worker] Patch script loaded and executing...');
+
+// Simple worker-compatible logger
+const workerLogs: any[] = [];
+function logWorker(message: string, data?: any) {
+  const entry = {
+    timestamp: Date.now(),
+    message,
+    data
+  };
+  workerLogs.push(entry);
+  console.log('[NSV Worker]', message, data || '');
+}
+
 async function fetchTwitchDataGQL(vodID: string): Promise<any> {
   const resp = await fetch("https://gql.twitch.tv/gql", {
     method: 'POST',
@@ -41,26 +55,38 @@ async function isValidQuality(url: string): Promise<{ codec: string } | null> {
 }
 
 const oldFetch = (self as any).fetch;
+console.log('[NSV Worker] Overriding fetch function in worker context...');
 
 (self as any).fetch = async function(input: RequestInfo, init?: RequestInit): Promise<Response> {
   const url = input instanceof Request ? input.url : input.toString();
+  const method = init?.method || (input instanceof Request ? input.method : 'GET');
+  
+  // Log all intercepted requests in worker
+  logWorker('Intercepted request', { url, method });
+  
   const response = await oldFetch(input, init);
 
   // Patch playlist from unmuted to muted segments
   if (url.includes('cloudfront') && url.includes('.m3u8')) {
+    logWorker('Patching unmuted to muted segments', { url });
     const body = await response.text();
     return new Response(body.replace(/-unmuted/g, '-muted'), { status: 200 });
   }
 
   if (url.startsWith('https://usher.ttvnw.net/vod/')) {
+    logWorker('VOD request detected', { url, status: response.status });
     if (response.status !== 200) {
+      logWorker('VOD access denied, generating fake playlist', { status: response.status });
       const vodId = url.split('https://usher.ttvnw.net/vod/')[1].split('.m3u8')[0];
       const data = await fetchTwitchDataGQL(vodId);
       if (!data || !data.data) {
+        logWorker('Failed to fetch twitch data API', { error: 'No data returned' });
         return new Response('Unable to fetch twitch data API', { status: 403 });
       }
       const vodData = data.data.video;
       const channelData = vodData.owner;
+      
+      logWorker('VOD data fetched', { channel: channelData.login, type: vodData.broadcastType });
 
       const resolutions: Record<string, { res: string; fps: number }> = {
         '160p30': { res: '284x160', fps: 30 },
@@ -78,6 +104,8 @@ const oldFetch = (self as any).fetch;
       const paths = currentURL.pathname.split('/');
       const vodSpecialID = paths[paths.findIndex((el: string) => el.includes('storyboards')) - 1];
       
+      logWorker('Using domain and vodSpecialID', { domain, vodSpecialID });
+      
       let fakePlaylist = `#EXTM3U
 #EXT-X-TWITCH-INFO:ORIGIN="s3",B="false",REGION="EU",USER-IP="127.0.0.1",SERVING-ID="${createServingID()}",CLUSTER="cloudfront_vod",USER-COUNTRY="BE",MANIFEST-CLUSTER="cloudfront_vod"`;
 
@@ -86,6 +114,7 @@ const oldFetch = (self as any).fetch;
       const daysDiff = (now.getTime() - created.getTime()) / 86400000;
       const broadcastType = vodData.broadcastType.toLowerCase();
       let startBandwidth = 8534030;
+      let validQualitiesCount = 0;
 
       for (const resKey of keys) {
         let streamUrl: string | undefined;
@@ -99,6 +128,8 @@ const oldFetch = (self as any).fetch;
         if (!streamUrl) continue;
         const valid = await isValidQuality(streamUrl);
         if (valid) {
+          validQualitiesCount++;
+          logWorker('Valid quality found', { quality: resKey, codec: valid.codec });
           const quality = resKey === 'chunked' ? `${resolutions[resKey].res.split('x')[1]}p` : resKey;
           const enabled = resKey === 'chunked' ? 'YES' : 'NO';
           fakePlaylist += `
@@ -106,15 +137,26 @@ const oldFetch = (self as any).fetch;
 #EXT-X-STREAM-INF:BANDWIDTH=${startBandwidth},CODECS="${valid.codec},mp4a.40.2",RESOLUTION=${resolutions[resKey].res},VIDEO="${quality}",FRAME-RATE=${resolutions[resKey].fps}
 ${streamUrl}`;
           startBandwidth -= 100;
+        } else {
+          logWorker('Invalid quality', { quality: resKey });
         }
       }
 
+      logWorker('Fake playlist generated', { qualitiesCount: validQualitiesCount });
       const headers = new Headers({ 'Content-Type': 'application/vnd.apple.mpegurl' });
       return new Response(fakePlaylist, { status: 200, headers });
+    } else {
+      logWorker('VOD access granted, using original response', { status: 200 });
     }
   }
 
+  logWorker('Response', { url, status: response.status });
   return response;
 };
+
+console.log('[NSV Worker] Fetch override installed successfully in worker context');
+
+// Expose worker logs to main thread via message
+(self as any).getWorkerLogs = () => workerLogs;
 
 export {};

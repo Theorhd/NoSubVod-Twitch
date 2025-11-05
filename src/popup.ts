@@ -244,6 +244,7 @@ async function loadSettings(): Promise<void> {
   (document.getElementById('settingThumbnails') as HTMLInputElement).checked = settings.showThumbnails;
   (document.getElementById('settingMaxHistory') as HTMLInputElement).value = settings.maxHistoryItems.toString();
   (document.getElementById('settingAutoCleanup') as HTMLInputElement).value = settings.autoCleanupDays.toString();
+  (document.getElementById('settingDeveloperMode') as HTMLInputElement).checked = settings.developerMode;
 }
 
 async function saveSettings(): Promise<void> {
@@ -253,7 +254,8 @@ async function saveSettings(): Promise<void> {
     enableNotifications: (document.getElementById('settingNotifications') as HTMLInputElement).checked,
     showThumbnails: (document.getElementById('settingThumbnails') as HTMLInputElement).checked,
     maxHistoryItems: parseInt((document.getElementById('settingMaxHistory') as HTMLInputElement).value),
-    autoCleanupDays: parseInt((document.getElementById('settingAutoCleanup') as HTMLInputElement).value)
+    autoCleanupDays: parseInt((document.getElementById('settingAutoCleanup') as HTMLInputElement).value),
+    developerMode: (document.getElementById('settingDeveloperMode') as HTMLInputElement).checked
   };
 
   await storage.saveSettings(settings);

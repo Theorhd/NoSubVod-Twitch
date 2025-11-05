@@ -1,7 +1,7 @@
 {
   "name": "nosubvod-twitch",
-  "version": "0.3.0",
-  "description": "Show sub-only VOD on Twitch",
+  "version": "1.0.0",
+  "description": "Show sub-only VOD on Twitch & Block all ads for instant stream access",
   "manifest_version": 3,
   "action": {
     "default_title": "NoSubVod Twitch",
@@ -21,7 +21,8 @@
         "dist/inject.js",
         "dist/patch_amazonworker.js",
         "dist/InterfaceChange.js",
-        "dist/ChatCustomizer.js"
+        "dist/ChatCustomizer.js",
+        "dist/ad-killer.js"
       ],
       "matches": [
         "https://*.twitch.tv/*"
