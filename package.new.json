@@ -1,0 +1,20 @@
+{
+  "name": "nosubvod-twitch",
+  "version": "0.4.0",
+  "description": "Show sub-only VOD on Twitch - Modular Architecture",
+  "scripts": {
+    "build:old": "esbuild src/page_init.ts src/app.ts src/patch_amazonworker.ts src/inject.ts src/nosubvod.ts src/restriction-remover.ts src/chat-customizer-bridge.ts src/InterfaceChange.ts src/ChatCustomizer.ts src/popup.ts src/background.ts src/download.ts --bundle --outdir=dist --platform=browser --format=iife --minify",
+    "build:new": "esbuild src/page-script-entry.ts src/content-script-entry.ts src/inject-unified.ts src/patch_amazonworker.ts src/chat-customizer-bridge.ts src/feature-test-helper.ts src/popup.ts src/background.ts src/download.ts --bundle --outdir=dist --platform=browser --format=iife --minify",
+    "build": "npm run build:new",
+    "build:all": "npm run build:old && npm run build:new",
+    "watch:old": "esbuild src/page_init.ts src/app.ts src/patch_amazonworker.ts src/inject.ts src/nosubvod.ts src/restriction-remover.ts src/chat-customizer-bridge.ts src/InterfaceChange.ts src/ChatCustomizer.ts src/popup.ts src/background.ts src/download.ts --bundle --outdir=dist --platform=browser --format=iife --watch",
+    "watch:new": "esbuild src/page-script-entry.ts src/content-script-entry.ts src/inject-unified.ts src/patch_amazonworker.ts src/chat-customizer-bridge.ts src/feature-test-helper.ts src/popup.ts src/background.ts src/download.ts --bundle --outdir=dist --platform=browser --format=iife --watch",
+    "watch": "npm run watch:new",
+    "clean": "rm -rf dist",
+    "dev": "npm run clean && npm run watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.11",
+    "typescript": "^4.9.5"
+  }
+}

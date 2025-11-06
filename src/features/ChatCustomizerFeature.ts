@@ -1,9 +1,9 @@
 /**
- * ChatCustomizer - Personnalisation du chat Twitch
- * Gère les customisations du pseudo et du badge de l'utilisateur courant
- * Ce script s'exécute dans le contexte de la page (injected script)
- * Les paramètres sont reçus via le chat-customizer-bridge content script
+ * ChatCustomizerFeature.ts
+ * Feature qui personnalise le chat Twitch (badges et effets de pseudo)
  */
+
+import { Feature, FeatureConfig, FeatureContext } from '../core/Feature';
 
 export interface ChatCustomizationSettings {
   enableMyBadge: boolean;
@@ -13,7 +13,7 @@ export interface ChatCustomizationSettings {
   myEffect: string;
 }
 
-class ChatCustomizer {
+export class ChatCustomizerFeature extends Feature {
   private settings: ChatCustomizationSettings = {
     enableMyBadge: false,
     myBadgeText: '',
@@ -41,64 +41,41 @@ class ChatCustomizer {
   private lastUrl: string = '';
 
   constructor() {
-    this.init();
+    const config: FeatureConfig = {
+      id: 'chat-customizer',
+      name: 'Chat Customizer',
+      description: 'Personnalise le chat Twitch avec badges et effets de pseudo personnalisés',
+      version: '1.0.0',
+      enabledByDefault: true,
+      context: [FeatureContext.PAGE_SCRIPT],
+      urlPatterns: [/^https?:\/\/(www\.)?twitch\.tv\//],
+    };
+    super(config);
   }
 
-  private async init(): Promise<void> {
+  protected async onInitialize(): Promise<void> {
+    this.log('Initializing chat customizer');
     this.injectStyleSheet();
     this.getCurrentUsername();
     this.setupSettingsListener();
+  }
+
+  protected async onEnable(): Promise<void> {
+    this.log('Enabling chat customizer');
     this.startPolling();
     this.watchUrlChanges();
-    console.log('[NSV] ChatCustomizer initialized');
   }
 
-  // Détecter les changements d'URL (changement de stream)
-  private watchUrlChanges(): void {
-    this.lastUrl = window.location.href;
-    
-    // Vérifier les changements d'URL toutes les secondes
-    setInterval(() => {
-      if (window.location.href !== this.lastUrl) {
-        console.log('[NSV] URL changed, reinitializing...');
-        this.lastUrl = window.location.href;
-        this.onPageChange();
-      }
-    }, 1000);
+  protected async onDisable(): Promise<void> {
+    this.log('Disabling chat customizer');
+    this.stopPolling();
   }
 
-  private onPageChange(): void {
-    // Réinitialiser l'état
-    this.modifiedElements = new WeakSet<Element>();
-    this.getCurrentUsername();
-    
-    // Demander au bridge de recharger les settings
-    console.log('[NSV] Requesting settings reload from bridge');
-    window.dispatchEvent(new CustomEvent('NSV_RELOAD_SETTINGS'));
-    
-    // Attendre un peu puis retraiter les messages
-    setTimeout(() => {
-      this.reprocessAllMessages();
-    }, 200);
+  protected async onDestroy(): Promise<void> {
+    this.stopPolling();
+    this.cleanupStyles();
   }
 
-  // Initialiser les paramètres depuis le storage lors du démarrage
-  private initializeSettings(): void {
-    // Essayer de récupérer les paramètres depuis window.NSV_SETTINGS (défini par le bridge)
-    if ((window as any).NSV_SETTINGS) {
-      this.settings = { ...this.settings, ...(window as any).NSV_SETTINGS };
-      console.log('[NSV] Settings loaded from window.NSV_SETTINGS:', this.settings);
-      if (this.settings.enableMyBadge && this.settings.myBadgeText) {
-        this.injectHideBadgesCSS();
-      }
-      // Retraiter les messages existants avec les nouveaux paramètres
-      setTimeout(() => {
-        this.reprocessAllMessages();
-      }, 100);
-    }
-  }
-
-  // Injecter une feuille de style pour les effets
   private injectStyleSheet(): void {
     const style = document.createElement('style');
     style.id = 'nsv-chat-customizer-styles';
@@ -107,7 +84,6 @@ class ChatCustomizer {
         /* Les styles spécifiques seront ajoutés dynamiquement */
       }
       
-      /* Styling pour le badge personnalisé pour que Twitch affiche le placeholder */
       .nsv-custom-badge {
         display: inline-flex !important;
         align-items: center !important;
@@ -118,45 +94,81 @@ class ChatCustomizer {
         position: relative;
       }
       
-      /* Créer un effect de hover comme Twitch */
       .nsv-custom-badge:hover {
         opacity: 0.8;
       }
     `;
     document.head.appendChild(style);
     this.styleSheet = style.sheet as CSSStyleSheet;
-    console.log('[NSV] Style sheet injected');
+    this.log('Style sheet injected');
   }
 
-  // Écoute les messages du bridge pour les changements de paramètres
+  private cleanupStyles(): void {
+    const customStyles = document.getElementById('nsv-chat-customizer-styles');
+    const hideBadgeStyles = document.getElementById('nsv-hide-badges-style');
+    customStyles?.remove();
+    hideBadgeStyles?.remove();
+  }
+
+  private watchUrlChanges(): void {
+    this.lastUrl = window.location.href;
+    
+    setInterval(() => {
+      if (window.location.href !== this.lastUrl) {
+        this.log('URL changed, reinitializing...');
+        this.lastUrl = window.location.href;
+        this.onPageChange();
+      }
+    }, 1000);
+  }
+
+  private onPageChange(): void {
+    this.modifiedElements = new WeakSet<Element>();
+    this.getCurrentUsername();
+    
+    window.dispatchEvent(new CustomEvent('NSV_RELOAD_SETTINGS'));
+    
+    setTimeout(() => {
+      this.reprocessAllMessages();
+    }, 200);
+  }
+
   private setupSettingsListener(): void {
-    // Écouter le CustomEvent du bridge (envoyé au démarrage et lors des mises à jour)
     window.addEventListener('NSV_SETTINGS_UPDATED', (event: any) => {
       const newSettings = event.detail;
-      console.log('[NSV] ChatCustomizer settings updated via CustomEvent:', newSettings);
+      this.log('Settings updated via CustomEvent:', newSettings);
       this.settings = { ...this.settings, ...newSettings };
       if (this.settings.enableMyBadge && this.settings.myBadgeText) {
         this.injectHideBadgesCSS();
       }
-      // Retraiter les messages existants avec les nouveaux paramètres
       this.reprocessAllMessages();
     });
 
-    // Écouter aussi les messages directs depuis les onglets (alternative)
     window.addEventListener('message', (event: any) => {
       if (event.data && event.data.type === 'CHAT_CUSTOMIZATION_UPDATED') {
-        console.log('[NSV] ChatCustomizer settings updated via message:', event.data.settings);
+        this.log('Settings updated via message:', event.data.settings);
         this.settings = { ...this.settings, ...event.data.settings };
         if (this.settings.enableMyBadge && this.settings.myBadgeText) {
           this.injectHideBadgesCSS();
         }
-        // Retraiter les messages existants avec les nouveaux paramètres
         this.reprocessAllMessages();
       }
     });
     
-    // Appeler initializeSettings après la création du listener pour charger les settings existants
     this.initializeSettings();
+  }
+
+  private initializeSettings(): void {
+    if ((window as any).NSV_SETTINGS) {
+      this.settings = { ...this.settings, ...(window as any).NSV_SETTINGS };
+      this.log('Settings loaded from window.NSV_SETTINGS:', this.settings);
+      if (this.settings.enableMyBadge && this.settings.myBadgeText) {
+        this.injectHideBadgesCSS();
+      }
+      setTimeout(() => {
+        this.reprocessAllMessages();
+      }, 100);
+    }
   }
 
   private injectHideBadgesCSS(): void {
@@ -171,29 +183,26 @@ class ChatCustomizer {
       }
     `;
     document.head.appendChild(style);
-    console.log('[NSV] Native badges hidden CSS injected');
+    this.log('Native badges hidden CSS injected');
   }
 
   private getCurrentUsername(): void {
-    // Essai 1: Récupérer depuis le cookie 'login' de Twitch
     const loginCookie = this.getCookieValue('login');
     if (loginCookie) {
       this.currentUsername = loginCookie;
-      console.log('[NSV] Current username detected from cookie:', this.currentUsername);
+      this.log('Current username detected from cookie:', this.currentUsername);
       return;
     }
 
-    // Essai 2: Menu utilisateur en haut à droite
     let userElement = document.querySelector('[data-a-target="user-menu-toggle"]') as HTMLElement;
 
-    // Essai 3: Chercher n'importe quel élément avec data-a-user
     if (!userElement) {
       const firstMessage = document.querySelector('[data-a-user]');
       if (firstMessage) {
         const username = firstMessage.getAttribute('data-a-user');
         if (username) {
           this.currentUsername = username;
-          console.log('[NSV] Current username detected from message:', this.currentUsername);
+          this.log('Current username detected from message:', this.currentUsername);
           return;
         }
       }
@@ -201,12 +210,10 @@ class ChatCustomizer {
 
     if (userElement && userElement.textContent) {
       this.currentUsername = userElement.textContent.trim();
-      console.log('[NSV] Current username detected from DOM:', this.currentUsername);
+      this.log('Current username detected from DOM:', this.currentUsername);
       return;
     }
 
-    // Retry if not found yet
-    console.log('[NSV] Username not found yet, retrying...');
     setTimeout(() => this.getCurrentUsername(), 1000);
   }
 
@@ -223,24 +230,22 @@ class ChatCustomizer {
   }
 
   private startPolling(): void {
-    console.log('[NSV] Starting chat monitoring with polling');
+    this.log('Starting chat monitoring with polling');
     
-    // Vérifier les messages toutes les 500ms
     this.pollingInterval = window.setInterval(() => {
       if (!this.isProcessing) {
         this.processExistingMessages();
       }
     }, 500);
 
-    console.log('[NSV] ChatCustomizer polling initialized');
-    console.log('[NSV] Current username:', this.currentUsername || '(not yet detected)');
+    this.log('ChatCustomizer polling initialized');
   }
 
   private stopPolling(): void {
     if (this.pollingInterval !== null) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
-      console.log('[NSV] Polling stopped');
+      this.log('Polling stopped');
     }
   }
 
@@ -255,7 +260,6 @@ class ChatCustomizer {
   }
 
   private processChatLine(chatLine: Element): void {
-    // Vérifications rapides pour éviter le traitement inutile
     if (!chatLine || this.modifiedElements.has(chatLine)) {
       return;
     }
@@ -265,10 +269,8 @@ class ChatCustomizer {
       return;
     }
 
-    // Marquer comme traité
     this.modifiedElements.add(chatLine);
 
-    // Appliquer les customisations
     if (this.settings.enableMyBadge && this.settings.myBadgeText) {
       this.applyCustomBadge(chatLine);
     }
@@ -279,17 +281,14 @@ class ChatCustomizer {
   }
 
   private applyCustomBadge(chatLine: Element): void {
-    // Vérifier s'il y a déjà un badge NSV
     if (chatLine.querySelector('.nsv-custom-badge')) return;
 
-    // Trouver le point d'insertion
     const badgeContainer = chatLine.querySelector('[data-a-target="chat-badge"]');
     const insertPoint = badgeContainer?.parentElement || 
                        chatLine.querySelector('[data-a-target="chat-message-username"]')?.parentElement;
 
     if (!insertPoint) return;
 
-    // Créer le badge
     const badge = this.createBadgeElement();
     insertPoint.insertBefore(badge, insertPoint.firstChild);
   }
@@ -310,7 +309,6 @@ class ChatCustomizer {
       badge.setAttribute('title', this.settings.myBadgeName);
     }
 
-    // Ajouter le contenu (image ou texte)
     if (this.settings.myBadgeText.startsWith('data:image')) {
       badge.appendChild(this.createBadgeImage());
     } else {
@@ -357,7 +355,6 @@ class ChatCustomizer {
       return;
     }
 
-    // Réinitialiser et appliquer l'effet
     displayName.classList.remove('nsv-username-effect');
     displayName.removeAttribute('data-effect');
 
@@ -365,31 +362,30 @@ class ChatCustomizer {
     if (!effectStyle || !this.styleSheet) return;
 
     try {
-      // Nettoyer et injecter la nouvelle règle CSS
       this.updateEffectStyleSheet(this.settings.myEffect, effectStyle);
-      
-      // Appliquer la classe et l'attribut
       displayName.setAttribute('data-effect', this.settings.myEffect);
       displayName.classList.add('nsv-username-effect');
     } catch (e) {
-      console.error('[NSV] Error applying effect:', e);
+      this.logError('Error applying effect:', e);
     }
   }
 
   private updateEffectStyleSheet(effectName: string, effectStyle: string): void {
     if (!this.styleSheet) return;
 
-    // Nettoyer les anciennes règles
     while (this.styleSheet.cssRules.length > 0) {
       this.styleSheet.deleteRule(0);
     }
 
-    // Ajouter la nouvelle règle
     const ruleText = `.nsv-username-effect[data-effect="${effectName}"] { ${effectStyle} }`;
     this.styleSheet.insertRule(ruleText, 0);
   }
 
-  // API publique simplifiée
+  private reprocessAllMessages(): void {
+    this.modifiedElements = new WeakSet<Element>();
+    this.processExistingMessages();
+  }
+
   public updateSettings(newSettings: Partial<ChatCustomizationSettings>): void {
     this.settings = { ...this.settings, ...newSettings };
     this.reprocessAllMessages();
@@ -398,29 +394,4 @@ class ChatCustomizer {
   public getSettings(): ChatCustomizationSettings {
     return { ...this.settings };
   }
-
-  private reprocessAllMessages(): void {
-    // Réinitialiser et retraiter tous les messages
-    this.modifiedElements = new WeakSet<Element>();
-    this.processExistingMessages();
-  }
-
-  public destroy(): void {
-    this.stopPolling();
-    
-    // Nettoyer les styles injectés
-    const customStyles = document.getElementById('nsv-chat-customizer-styles');
-    const hideBadgeStyles = document.getElementById('nsv-hide-badges-style');
-    
-    customStyles?.remove();
-    hideBadgeStyles?.remove();
-    
-    console.log('[NSV] ChatCustomizer destroyed');
-  }
 }
-
-// Initialisation automatique
-const customizer = new ChatCustomizer();
-(window as any).chatCustomizer = customizer;
-
-export default ChatCustomizer;

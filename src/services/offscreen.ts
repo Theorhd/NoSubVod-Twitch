@@ -3,7 +3,7 @@ console.log('[NoSubVod Offscreen] Document loaded');
 
 declare const chrome: any;
 
-import { IndexedDBHelper } from './indexed-db-helper';
+import { IndexedDBHelper } from '../utils/indexed-db-helper';
 
 const dbHelper = new IndexedDBHelper();
 

@@ -1,33 +1,55 @@
 /**
- * InterfaceChange.ts
- * Modifies Twitch interface elements to simulate subscriber status
- * Replaces the subscribe button with a "subscribed" state button
+ * InterfaceChangerFeature.ts
+ * Feature qui modifie l'interface Twitch pour simuler un statut d'abonné
  */
 
-class InterfaceChange {
-  private observer!: MutationObserver;
+import { Feature, FeatureConfig, FeatureContext } from '../core/Feature';
+
+export class InterfaceChangerFeature extends Feature {
+  private observer: MutationObserver | null = null;
   private modifiedButtons = new WeakSet<HTMLElement>();
 
   constructor() {
-    this.modifyExistingElements();
-    this.createObserver();
+    const config: FeatureConfig = {
+      id: 'interface-changer',
+      name: 'Interface Changer',
+      description: 'Modifie les boutons d\'abonnement pour simuler un statut d\'abonné',
+      version: '1.0.0',
+      enabledByDefault: true,
+      context: [FeatureContext.PAGE_SCRIPT, FeatureContext.CONTENT_SCRIPT],
+      urlPatterns: [/^https?:\/\/(www\.)?twitch\.tv\//],
+    };
+    super(config);
   }
 
-  /**
-   * Process and modify existing subscribe buttons on the page
-   */
+  protected async onInitialize(): Promise<void> {
+    this.log('Initializing interface changer');
+  }
+
+  protected async onEnable(): Promise<void> {
+    this.log('Enabling interface changer');
+    this.modifyExistingElements();
+    this.startObserver();
+  }
+
+  protected async onDisable(): Promise<void> {
+    this.log('Disabling interface changer');
+    this.stopObserver();
+    // Note: On ne restaure pas les boutons modifiés pour éviter des problèmes
+  }
+
+  protected async onDestroy(): Promise<void> {
+    this.stopObserver();
+  }
+
   private modifyExistingElements(): void {
-    // Find all subscribe buttons on the page
     this.findAndModifySubscribeButtons();
-    
-    // Remove video restriction overlays
     this.removeVideoRestrictions();
   }
 
-  private createObserver(): void {
-    // Ensure DOM is ready
+  private startObserver(): void {
     if (!document.body) {
-      setTimeout(() => this.createObserver(), 100);
+      setTimeout(() => this.startObserver(), 100);
       return;
     }
 
@@ -45,19 +67,24 @@ class InterfaceChange {
       childList: true,
       subtree: true,
     });
+
+    this.log('Observer started');
   }
 
-  /**
-   * Process a node to find and modify subscribe buttons
-   */
+  private stopObserver(): void {
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
+      this.log('Observer stopped');
+    }
+  }
+
   private processNode(node: Element): void {
-    // Check if this node is a subscribe button
     if (this.isSubscribeButton(node)) {
       this.modifySubscribeButton(node as HTMLElement);
       return;
     }
 
-    // Check children for subscribe buttons
     node.querySelectorAll('button').forEach((btn) => {
       if (this.isSubscribeButton(btn)) {
         this.modifySubscribeButton(btn);
@@ -65,9 +92,6 @@ class InterfaceChange {
     });
   }
 
-  /**
-   * Find all subscribe buttons on the current page
-   */
   private findAndModifySubscribeButtons(): void {
     const buttons = document.querySelectorAll('button');
     buttons.forEach((btn) => {
@@ -77,17 +101,12 @@ class InterfaceChange {
     });
   }
 
-  /**
-   * Determine if a button is a subscribe/re-subscribe button
-   */
   private isSubscribeButton(element: Element): boolean {
     if (element.tagName !== 'BUTTON') {
       return false;
     }
 
     const button = element as HTMLElement;
-    
-    // Check data-a-target attribute (Twitch specific)
     const dataTarget = button.getAttribute('data-a-target')?.toLowerCase() || '';
     if (dataTarget.includes('subscribe')) {
       return true;
@@ -96,7 +115,6 @@ class InterfaceChange {
     const text = button.textContent?.toLowerCase() || '';
     const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
 
-    // Check for common subscribe/resubscribe button text patterns
     const subscribePatterns = [
       'subscribe',
       's\'abonner',
@@ -113,56 +131,37 @@ class InterfaceChange {
     );
   }
 
-  /**
-   * Modify a subscribe button to appear as if we are already subscribed
-   */
   private modifySubscribeButton(button: HTMLElement): void {
-    // Prevent double modification
     if (this.modifiedButtons.has(button)) {
       return;
     }
     this.modifiedButtons.add(button);
 
-    // Store original state
     button.setAttribute('data-nsv-original-aria-label', button.getAttribute('aria-label') || '');
     button.setAttribute('data-nsv-modified', 'true');
 
-    // Disable button interactions
     (button as HTMLButtonElement).disabled = true;
 
-    // Update visual styling to indicate subscribed state
     this.updateButtonStyles(button);
-
-    // Update button text and aria-label
     this.updateButtonText(button);
 
-    // Prevent click events
     button.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
     }, true);
   }
 
-  /**
-   * Update the CSS classes and styles for subscribed appearance
-   */
   private updateButtonStyles(button: HTMLElement): void {
-    // Apply styling to indicate disabled/subscribed state
     button.style.opacity = '0.7';
     button.style.cursor = 'default';
     button.style.pointerEvents = 'none';
 
-    // Change button appearance to look like a subscribed/inactive button
-    // Find the label text element within the button
     const labelElement = button.querySelector('[data-a-target="tw-core-button-label-text"]') as HTMLElement;
     if (labelElement) {
       labelElement.style.opacity = '0.8';
     }
   }
 
-  /**
-   * Update the button text to indicate subscription
-   */
   private updateButtonText(button: HTMLElement): void {
     const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
     const text = button.textContent?.toLowerCase() || '';
@@ -170,7 +169,6 @@ class InterfaceChange {
     let newLabel = 'Subscribed';
     let newText = 'Subscribed';
 
-    // Localize based on current language
     if (ariaLabel.includes('s\'abonner') || text.includes('s\'abonner')) {
       newLabel = 'Abonné';
       newText = 'Abonné';
@@ -179,10 +177,8 @@ class InterfaceChange {
       newText = 'Abonné';
     }
 
-    // Update aria-label
     button.setAttribute('aria-label', newLabel);
 
-    // Update button text content
     const labelElement = button.querySelector('[data-a-target="tw-core-button-label-text"]') as HTMLElement;
     if (labelElement) {
       labelElement.textContent = newText;
@@ -191,18 +187,7 @@ class InterfaceChange {
     }
   }
 
-  /**
-   * Stop observing the document
-   */
-  public disconnect(): void {
-    this.observer.disconnect();
-  }
-
-  /**
-   * Remove video restriction overlays/badges from video cards
-   */
   private removeVideoRestrictions(): void {
-    // Find and remove restriction badges on video cards
     const restrictionSelectors = [
       '.video-preview-card-restriction',
       '[data-a-target*="restriction"]',
@@ -214,7 +199,6 @@ class InterfaceChange {
           const text = (el.textContent || '').toLowerCase();
           const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
 
-          // Check if it's a subscription restriction
           if (
             text.includes('réservé') ||
             text.includes('reserved') ||
@@ -232,27 +216,3 @@ class InterfaceChange {
     });
   }
 }
-
-// Initialize on page load
-function initInterfaceChange() {
-  if (!document.body) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initInterfaceChange);
-    } else {
-      setTimeout(initInterfaceChange, 100);
-    }
-    return;
-  }
-  new InterfaceChange();
-  console.log('[NSV] InterfaceChange initialized');
-}
-
-// Start initialization
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initInterfaceChange);
-} else {
-  initInterfaceChange();
-}
-
-export { InterfaceChange };
-

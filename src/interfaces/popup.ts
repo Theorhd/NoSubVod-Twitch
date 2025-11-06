@@ -1,7 +1,7 @@
 declare const chrome: any;
 
-import { storage, VodDownload, Settings, ActiveDownload } from './storage';
-import { badgeManager, Badge, PRESET_BADGES } from './badge-manager';
+import { storage, VodDownload, Settings, ActiveDownload } from '../utils/storage';
+import { badgeManager, Badge, PRESET_BADGES } from '../utils/badge-manager';
 
 // Util: current active tab URL
 async function getActiveTabUrl(): Promise<string | null> {
@@ -766,7 +766,7 @@ function setupChatCustomization() {
   const successMsg = document.getElementById('chatCustomizationSuccess') as HTMLElement;
 
   // Load saved settings
-  chrome.storage.sync.get('chatCustomization', (result: any) => {
+  chrome.storage.local.get('chatCustomization', (result: any) => {
     if (result.chatCustomization) {
       badgeInput.value = result.chatCustomization.myBadgeText || '';
       badgeNameInput.value = result.chatCustomization.myBadgeName || '';
@@ -788,7 +788,7 @@ function setupChatCustomization() {
       myEffect: effectType
     };
 
-    chrome.storage.sync.set({ chatCustomization: settings }, () => {
+    chrome.storage.local.set({ chatCustomization: settings }, () => {
       successMsg.textContent = '✅ Personnalisation enregistrée !';
       successMsg.style.color = '#4caf50';
       setTimeout(() => {
@@ -817,3 +817,8 @@ function setupChatCustomization() {
 init();
 setupBadgeManager();
 setupChatCustomization();
+
+// Open settings page
+document.getElementById('openSettings')?.addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('dist/settings.html') });
+});

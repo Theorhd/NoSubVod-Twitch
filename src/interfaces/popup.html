@@ -108,9 +108,12 @@
   <body>
     <header>
       <div class="header-left">
-        <img src="assets/icons/icon.png" alt="icon" width="20" height="20">
+        <img src="../../assets/icons/icon.png" alt="icon" width="20" height="20">
         <h1>NoSubVod Twitch</h1>
       </div>
+      <button id="openSettings" style="background: none; border: none; cursor: pointer; padding: 8px; border-radius: 6px; transition: background 0.2s;" title="Ouvrir les paramètres">
+        <span style="font-size: 20px;">⚙️</span>
+      </button>
       <span id="version" class="muted" style="font-size: 11px;">v0.3.0</span>
     </header>
     
@@ -330,6 +333,6 @@
       <div class="success" id="settingsSuccess"></div>
     </div>
     
-    <script src="dist/popup.js"></script>
+    <script src="popup.js"></script>
   </body>
 </html>

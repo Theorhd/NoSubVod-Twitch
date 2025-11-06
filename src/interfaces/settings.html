@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Paramètres - NoSubVod</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { 
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; 
+        margin: 0; 
+        padding: 0; 
+        min-width: 600px;
+        color: #e3e3e3; 
+        background: #0e0e10; 
+      }
+      
+      /* Header */
+      header { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        padding: 20px 30px; 
+        border-bottom: 2px solid #2f2f37;
+        background: linear-gradient(135deg, #18181b 0%, #0e0e10 100%);
+      }
+      .header-left { display: flex; align-items: center; gap: 12px; }
+      .header-left img { filter: drop-shadow(0 0 8px rgba(145, 70, 255, 0.5)); }
+      h1 { 
+        font-size: 24px; 
+        margin: 0; 
+        background: linear-gradient(90deg, #9146FF, #b366ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      
+      /* Container */
+      .container { 
+        max-width: 900px; 
+        margin: 0 auto; 
+        padding: 30px; 
+      }
+      
+      /* Sections */
+      .section { 
+        background: #18181b; 
+        border-radius: 12px; 
+        padding: 24px; 
+        margin-bottom: 24px;
+        border: 1px solid #2f2f37;
+        transition: all 0.3s ease;
+      }
+      .section:hover {
+        border-color: #9146FF;
+        box-shadow: 0 4px 12px rgba(145, 70, 255, 0.1);
+      }
+      
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #2f2f37;
+      }
+      
+      .section-icon {
+        font-size: 32px;
+        line-height: 1;
+      }
+      
+      .section-title {
+        flex: 1;
+      }
+      
+      .section-title h2 {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0 0 4px 0;
+        color: #e3e3e3;
+      }
+      
+      .section-title p {
+        font-size: 13px;
+        color: #adadb8;
+        margin: 0;
+      }
+      
+      /* Feature toggles */
+      .feature-item {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 16px;
+        margin-bottom: 12px;
+        background: #0e0e10;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+      }
+      
+      .feature-item:hover {
+        background: #1f1f23;
+      }
+      
+      .feature-info {
+        flex: 1;
+        margin-right: 16px;
+      }
+      
+      .feature-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: #e3e3e3;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .feature-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #9146FF;
+        color: white;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+      
+      .feature-badge.recommended {
+        background: #00ff7f;
+        color: #0e0e10;
+      }
+      
+      .feature-description {
+        font-size: 13px;
+        color: #adadb8;
+        line-height: 1.5;
+      }
+      
+      /* Toggle switch */
+      .toggle {
+        position: relative;
+        width: 52px;
+        height: 28px;
+        flex-shrink: 0;
+      }
+      
+      .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #2f2f37;
+        border-radius: 28px;
+        transition: 0.3s;
+      }
+      
+      .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 3px;
+        bottom: 3px;
+        background: white;
+        border-radius: 50%;
+        transition: 0.3s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+      
+      .toggle input:checked + .toggle-slider {
+        background: #9146FF;
+      }
+      
+      .toggle input:checked + .toggle-slider:before {
+        transform: translateX(24px);
+      }
+      
+      .toggle input:disabled + .toggle-slider {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      
+      /* Input fields */
+      .input-group {
+        margin-bottom: 16px;
+      }
+      
+      .input-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #adadb8;
+        margin-bottom: 8px;
+        display: block;
+      }
+      
+      input[type="text"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #2f2f37;
+        background: #0e0e10;
+        color: #e3e3e3;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+      
+      input[type="text"]:focus,
+      input[type="number"]:focus,
+      select:focus {
+        outline: none;
+        border-color: #9146FF;
+        box-shadow: 0 0 0 3px rgba(145, 70, 255, 0.1);
+      }
+      
+      /* Buttons */
+      .btn-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      
+      button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      
+      .btn-primary {
+        background: linear-gradient(135deg, #9146FF, #b366ff);
+        color: white;
+        flex: 1;
+      }
+      
+      .btn-primary:hover {
+        background: linear-gradient(135deg, #a45fff, #c589f5);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(145, 70, 255, 0.3);
+      }
+      
+      .btn-secondary {
+        background: #2f2f37;
+        color: #e3e3e3;
+      }
+      
+      .btn-secondary:hover {
+        background: #3a3a42;
+      }
+      
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+      
+      /* Badge customization */
+      .badge-preview {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        background: #0e0e10;
+        border-radius: 8px;
+        margin-top: 12px;
+      }
+      
+      .badge-preview-label {
+        font-size: 13px;
+        color: #adadb8;
+      }
+      
+      .badge-preview-item {
+        padding: 8px 12px;
+        background: rgba(145, 70, 255, 0.2);
+        border-radius: 6px;
+        font-size: 14px;
+        border: 1px solid #9146FF;
+      }
+      
+      .badge-preview-item img {
+        width: 18px;
+        height: 18px;
+        object-fit: contain;
+        vertical-align: middle;
+      }
+      
+      .badge-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+      
+      .badge-btn {
+        width: 100%;
+        padding: 12px;
+        background: #0e0e10;
+        border: 2px solid #2f2f37;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 24px;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 60px;
+      }
+      
+      .badge-btn:hover {
+        background: #1f1f23;
+        border-color: #9146FF;
+      }
+      
+      .badge-btn.selected {
+        border-color: #9146FF;
+        background: rgba(145, 70, 255, 0.1);
+        box-shadow: 0 0 0 3px rgba(145, 70, 255, 0.2);
+      }
+      
+      .badge-btn img {
+        max-width: 100%;
+        max-height: 40px;
+        object-fit: contain;
+      }
+      
+      /* Effect preview */
+      .effect-preview {
+        display: inline-block;
+        font-size: 16px;
+        font-weight: 700;
+        padding: 8px 16px;
+        border-radius: 6px;
+        background: #0e0e10;
+        margin-top: 12px;
+      }
+      
+      /* Messages */
+      .message {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-top: 16px;
+        font-size: 14px;
+        display: none;
+      }
+      
+      .message.show {
+        display: block;
+        animation: slideIn 0.3s ease;
+      }
+      
+      .message.success {
+        background: rgba(76, 175, 80, 0.1);
+        border: 1px solid #4caf50;
+        color: #4caf50;
+      }
+      
+      .message.error {
+        background: rgba(255, 132, 132, 0.1);
+        border: 1px solid #ff8484;
+        color: #ff8484;
+      }
+      
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      /* Footer */
+      footer {
+        text-align: center;
+        padding: 24px;
+        color: #adadb8;
+        font-size: 12px;
+        border-top: 1px solid #2f2f37;
+        margin-top: 40px;
+      }
+      
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 12px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: #0e0e10;
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: #2f2f37;
+        border-radius: 6px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: #3a3a42;
+      }
+      
+      /* File input styling */
+      .file-input-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+        width: 100%;
+      }
+      
+      .file-input-wrapper input[type=file] {
+        position: absolute;
+        left: -9999px;
+      }
+      
+      .file-input-label {
+        display: block;
+        padding: 12px 24px;
+        background: #2f2f37;
+        color: #e3e3e3;
+        text-align: center;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-weight: 600;
+      }
+      
+      .file-input-label:hover {
+        background: #3a3a42;
+      }
+      
+      /* Info boxes */
+      .info-box {
+        background: rgba(145, 70, 255, 0.1);
+        border: 1px solid #9146FF;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-top: 12px;
+        font-size: 13px;
+        color: #adadb8;
+        line-height: 1.5;
+      }
+      
+      .info-box strong {
+        color: #9146FF;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-left">
+        <img src="../../assets/icons/icon.png" alt="icon" width="32" height="32">
+        <div>
+          <h1>NoSubVod Twitch</h1>
+          <span style="font-size: 12px; color: #adadb8;">Paramètres de l'extension</span>
+        </div>
+      </div>
+      <span id="version" style="font-size: 11px; color: #adadb8;">v0.3.0</span>
+    </header>
+    
+    <div class="container">
+      <!-- Features Section -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">🎯</div>
+          <div class="section-title">
+            <h2>Features Principales</h2>
+            <p>Activer ou désactiver les fonctionnalités de l'extension</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
+            <div class="feature-name">
+              🔓 VOD Unlocker
+              <span class="feature-badge recommended">Recommandé</span>
+            </div>
+            <div class="feature-description">
+              Déverrouille les VODs réservées aux abonnés en patchant le Worker Amazon. 
+              Cette feature permet de regarder toutes les vidéos sans restriction.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="feature-vod-unlocker" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
+            <div class="feature-name">
+              🎨 Interface Changer
+              <span class="feature-badge recommended">Recommandé</span>
+            </div>
+            <div class="feature-description">
+              Modifie l'interface Twitch pour simuler un statut d'abonné. 
+              Change les boutons "S'abonner" en "Abonné" et masque les restrictions visuelles.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="feature-interface-changer" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
+            <div class="feature-name">
+              💬 Chat Customizer
+            </div>
+            <div class="feature-description">
+              Personnalise votre apparence dans le chat avec des badges personnalisés 
+              et des effets visuels sur votre pseudo.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="feature-chat-customizer" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
+            <div class="feature-name">
+              🚫 Restriction Remover
+            </div>
+            <div class="feature-description">
+              Supprime les overlays et badges "Réservé aux abonnés" sur les miniatures 
+              et prévisualisations de vidéos.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="feature-restriction-remover" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- Chat Customization Section -->
+      <div class="section" id="chat-customization-section">
+        <div class="section-header">
+          <div class="section-icon">💬</div>
+          <div class="section-title">
+            <h2>Personnalisation du Chat</h2>
+            <p>Configurez votre apparence dans le chat Twitch</p>
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Badge Personnalisé</label>
+          <div class="info-box">
+            💡 <strong>Astuce :</strong> Vous pouvez utiliser des emojis (👑, ⭐, 🔥) ou du texte personnalisé ([VIP], [DEV])
+          </div>
+          
+          <div class="badge-grid" id="badge-presets">
+            <!-- Les badges prédéfinis seront ajoutés ici par JS -->
+          </div>
+          
+          <input type="text" id="chat-badge-text" placeholder="Ex: 👑 ou [VIP] ou laissez vide" style="margin-top: 12px;">
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Nom du Badge (Tooltip)</label>
+          <input type="text" id="chat-badge-name" placeholder="Ex: ZEVENT 2024, Supporter">
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Import d'un Badge Personnalisé</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="badge-file-input" accept="image/*">
+            <label for="badge-file-input" class="file-input-label">
+              📁 Importer une image (PNG, JPG, GIF)
+            </label>
+          </div>
+          <div id="badge-imported-container" style="margin-top: 12px; display: none;">
+            <div class="badge-preview">
+              <span class="badge-preview-label">Badge importé :</span>
+              <div class="badge-preview-item" id="badge-preview"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Effet du Pseudo</label>
+          <select id="chat-effect-select">
+            <option value="">Aucun effet</option>
+            <option value="rainbow">🌈 Arc-en-ciel</option>
+            <option value="gradient_purple">💜 Dégradé Violet</option>
+            <option value="gradient_ocean">💙 Dégradé Océan</option>
+            <option value="gradient_fire">🔥 Dégradé Feu</option>
+            <option value="gradient_sunset">🌅 Dégradé Coucher de Soleil</option>
+            <option value="glitch">⚡ Glitch</option>
+            <option value="neon_blue">💎 Néon Bleu</option>
+            <option value="neon_pink">💖 Néon Rose</option>
+          </select>
+          <div id="effect-preview-container" style="display: none;">
+            <span class="effect-preview" id="effect-preview">VotrePseudo</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Download Settings Section -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">📥</div>
+          <div class="section-title">
+            <h2>Paramètres de Téléchargement</h2>
+            <p>Configurez les options de téléchargement des VODs</p>
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Qualité par Défaut</label>
+          <select id="download-quality">
+            <option value="Source">Source (Meilleure qualité)</option>
+            <option value="1080p60">1080p60</option>
+            <option value="720p60">720p60</option>
+            <option value="480p30">480p30</option>
+            <option value="360p30">360p30</option>
+          </select>
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Segments Parallèles</label>
+          <input type="number" id="download-chunks" min="1" max="10" value="5">
+          <div class="info-box" style="margin-top: 8px;">
+            💡 Nombre de segments téléchargés simultanément. Plus le nombre est élevé, plus le téléchargement est rapide, mais utilise plus de bande passante.
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
+            <div class="feature-name">Notifications</div>
+            <div class="feature-description">
+              Recevoir une notification à la fin des téléchargements
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="download-notifications" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
+            <div class="feature-name">Miniatures</div>
+            <div class="feature-description">
+              Afficher les miniatures des VODs dans l'interface
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="download-thumbnails" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- Advanced Settings Section -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">⚙️</div>
+          <div class="section-title">
+            <h2>Paramètres Avancés</h2>
+            <p>Options supplémentaires pour utilisateurs avancés</p>
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Historique Maximum</label>
+          <input type="number" id="history-max" min="10" max="500" value="100">
+          <div class="info-box" style="margin-top: 8px;">
+            Nombre maximum d'éléments conservés dans l'historique de téléchargement
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Nettoyage Automatique (jours)</label>
+          <input type="number" id="history-cleanup" min="0" max="365" value="30">
+          <div class="info-box" style="margin-top: 8px;">
+            Supprime automatiquement les entrées d'historique après X jours. Mettez 0 pour désactiver.
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
+            <div class="feature-name">Mode Debug</div>
+            <div class="feature-description">
+              Active les logs détaillés dans la console pour le débogage
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="advanced-debug">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- Save/Reset Buttons -->
+      <div class="btn-group">
+        <button class="btn-primary" id="save-settings">💾 Enregistrer les Paramètres</button>
+        <button class="btn-secondary" id="reset-settings">🔄 Réinitialiser</button>
+      </div>
+      
+      <!-- Success/Error Messages -->
+      <div class="message success" id="success-message">
+        ✅ Paramètres enregistrés avec succès !
+      </div>
+      <div class="message error" id="error-message">
+        ❌ Erreur lors de l'enregistrement des paramètres
+      </div>
+    </div>
+    
+    <footer>
+      <p>NoSubVod Twitch Extension • Made with 💜 by the Community</p>
+      <p>⚠️ Utilisez cette extension de manière responsable</p>
+    </footer>
+    
+    <script src="settings.js"></script>
+  </body>
+</html>

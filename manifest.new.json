@@ -1,15 +1,11 @@
 {
   "name": "nosubvod-twitch",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Show sub-only VOD on Twitch",
   "manifest_version": 3,
   "action": {
     "default_title": "NoSubVod Twitch",
-    "default_popup": "dist/popup.html"
-  },
-  "options_ui": {
-    "page": "dist/settings.html",
-    "open_in_tab": true
+    "default_popup": "popup.html"
   },
   "background": {
     "service_worker": "dist/background.js"
@@ -21,7 +17,9 @@
     {
       "resources": [
         "dist/page-script-entry.js",
-        "dist/patch_amazonworker.js"
+        "dist/content-script-entry.js",
+        "dist/patch_amazonworker.js",
+        "dist/chat-customizer-bridge.js"
       ],
       "matches": [
         "https://*.twitch.tv/*"

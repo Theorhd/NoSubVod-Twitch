@@ -24,6 +24,7 @@ export interface Settings {
   maxHistoryItems: number;
   downloadChunkSize: number;
   theme: 'dark' | 'light' | 'auto';
+  debugMode: boolean;
 }
 
 export interface ActiveDownload {
@@ -47,7 +48,8 @@ const DEFAULT_SETTINGS: Settings = {
   showThumbnails: true,
   maxHistoryItems: 100,
   downloadChunkSize: 5,
-  theme: 'dark'
+  theme: 'dark',
+  debugMode: false
 };
 
 class StorageManager {

@@ -1,7 +1,7 @@
 declare const chrome: any;
 
-import { storage, VodDownload, ActiveDownload } from './storage';
-import { IndexedDBHelper } from './indexed-db-helper';
+import { storage, VodDownload, ActiveDownload } from '../utils/storage';
+import { IndexedDBHelper } from '../utils/indexed-db-helper';
 
 const dbHelper = new IndexedDBHelper();
 
@@ -231,7 +231,7 @@ async function downloadVod(
     });
     
     // Open download page (this has user context for showSaveFilePicker)
-    const downloadUrl = chrome.runtime.getURL('download.html') +
+    const downloadUrl = chrome.runtime.getURL('dist/download.html') +
       `?downloadId=${encodeURIComponent(downloadId)}` +
       `&filename=${encodeURIComponent(`twitch_vod_${vodInfo.id}.ts`)}` +
       `&segmentCount=${buffers.length}`;

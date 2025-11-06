@@ -1,22 +1,13 @@
-// Detect SPA navigation events and dispatch custom event
-(function() {
-  const _push = history.pushState;
-  history.pushState = function(...args) {
-    const res = _push.apply(this, args as any);
-    window.dispatchEvent(new Event('locationchange'));
-    return res;
-  };
-  const _replace = history.replaceState;
-  history.replaceState = function(...args) {
-    const res = _replace.apply(this, args as any);
-    window.dispatchEvent(new Event('locationchange'));
-    return res;
-  };
-  window.addEventListener('popstate', () => window.dispatchEvent(new Event('locationchange')));
-})();
-class RestrictionRemover {
-  private observer!: MutationObserver;
-  private restrictionSelectors = [
+/**
+ * RestrictionRemoverFeature.ts
+ * Feature qui supprime les overlays/badges de restriction sur les vidéos
+ */
+
+import { Feature, FeatureConfig, FeatureContext } from '../core/Feature';
+
+export class RestrictionRemoverFeature extends Feature {
+  private observer: MutationObserver | null = null;
+  private readonly restrictionSelectors = [
     '.video-preview-card-restriction',
     '[data-a-target*="restriction"]',
     '[aria-label*="réservé"]',
@@ -26,15 +17,49 @@ class RestrictionRemover {
   ];
 
   constructor() {
-    this.removeExistingRestrictions();
-    this.createObserver();
+    const config: FeatureConfig = {
+      id: 'restriction-remover',
+      name: 'Restriction Remover',
+      description: 'Supprime les overlays et badges de restriction sur les vidéos',
+      version: '1.0.0',
+      enabledByDefault: true,
+      context: [FeatureContext.CONTENT_SCRIPT],
+      urlPatterns: [/^https?:\/\/(www\.)?twitch\.tv\//],
+    };
+    super(config);
   }
 
-  public removeExistingRestrictions(): void {
+  protected async onInitialize(): Promise<void> {
+    this.log('Initializing restriction remover');
+  }
+
+  protected async onEnable(): Promise<void> {
+    this.log('Enabling restriction remover');
+    this.removeExistingRestrictions();
+    this.startObserver();
+    this.setupSPANavigation();
+  }
+
+  protected async onDisable(): Promise<void> {
+    this.log('Disabling restriction remover');
+    this.stopObserver();
+  }
+
+  protected async onDestroy(): Promise<void> {
+    this.stopObserver();
+  }
+
+  private setupSPANavigation(): void {
+    window.addEventListener('locationchange', () => {
+      this.log('SPA navigation detected, removing restrictions');
+      this.removeExistingRestrictions();
+    });
+  }
+
+  private removeExistingRestrictions(): void {
     this.restrictionSelectors.forEach(selector => {
       try {
         document.querySelectorAll(selector).forEach(el => {
-          // Only remove if it's a restriction overlay/badge
           if (this.isRestrictionElement(el)) {
             el.remove();
           }
@@ -50,7 +75,6 @@ class RestrictionRemover {
     const ariaLabel = (element.getAttribute('aria-label') || '').toLowerCase();
     const classString = typeof element.className === 'string' ? element.className : '';
 
-    // Check for common restriction indicators
     const restrictionKeywords = [
       'réservé',
       'reserved',
@@ -70,10 +94,9 @@ class RestrictionRemover {
     );
   }
 
-  private createObserver(): void {
-    // Ensure DOM is ready
+  private startObserver(): void {
     if (!document.body) {
-      setTimeout(() => this.createObserver(), 100);
+      setTimeout(() => this.startObserver(), 100);
       return;
     }
 
@@ -91,16 +114,24 @@ class RestrictionRemover {
       childList: true,
       subtree: true
     });
+
+    this.log('Observer started');
+  }
+
+  private stopObserver(): void {
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
+      this.log('Observer stopped');
+    }
   }
 
   private processNode(node: Element): void {
-    // Check if this node is a restriction element
     if (this.isRestrictionElement(node)) {
       node.remove();
       return;
     }
 
-    // Check all children for restriction elements
     this.restrictionSelectors.forEach(selector => {
       try {
         node.querySelectorAll(selector).forEach(el => {
@@ -114,18 +145,3 @@ class RestrictionRemover {
     });
   }
 }
-
-// Initialize restriction remover immediately for SPA and initial page load
-function initRestrictionRemover() {
-  if (!document.body) {
-    document.addEventListener('DOMContentLoaded', initRestrictionRemover);
-    return;
-  }
-  const remover = new RestrictionRemover();
-  // Remove restrictions on each SPA navigation
-  window.addEventListener('locationchange', () => remover.removeExistingRestrictions());
-}
-
-initRestrictionRemover();
-
-export {};
