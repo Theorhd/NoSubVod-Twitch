@@ -9,32 +9,47 @@
 
 declare const chrome: any;
 
-try {
-  // Configuration pour le patch URL - DOIT être fait AVANT l'injection du page script
-  const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
-  
-  // Solution 1 : Passer le patch_url via un attribut data sur le script
-  // Cela évite la violation CSP (pas de script inline)
-  const target = document.head || document.documentElement;
-  
-  // Injecter le script de page unifié avec l'URL en attribut data
-  const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
-  const pageScript = document.createElement('script');
-  pageScript.src = pageScriptUrl;
-  pageScript.setAttribute('data-patch-url', patchUrl);
-  pageScript.onload = () => pageScript.remove();
-  
-  // Insérer au début du document
-  if (target.firstChild) {
-    target.insertBefore(pageScript, target.firstChild);
-  } else {
-    target.appendChild(pageScript);
-  }
+// ============================================
+// IMPORTANT: Charger les settings AVANT d'injecter le page script
+// ============================================
+chrome.storage.local.get('chatCustomization', (result: any) => {
+  try {
+    // Préparer les settings pour le page script
+    if (result.chatCustomization) {
+      const settings = { ...result.chatCustomization };
+      if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+        settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
+      }
+      (window as any).NSV_SETTINGS = settings;
+      console.log('[NSV] Chat settings preloaded for page script');
+    }
+    
+    // Configuration pour le patch URL - DOIT être fait AVANT l'injection du page script
+    const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
+    
+    // Solution 1 : Passer le patch_url via un attribut data sur le script
+    // Cela évite la violation CSP (pas de script inline)
+    const target = document.head || document.documentElement;
+    
+    // Injecter le script de page unifié avec l'URL en attribut data
+    const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
+    const pageScript = document.createElement('script');
+    pageScript.src = pageScriptUrl;
+    pageScript.setAttribute('data-patch-url', patchUrl);
+    pageScript.onload = () => pageScript.remove();
+    
+    // Insérer au début du document
+    if (target.firstChild) {
+      target.insertBefore(pageScript, target.firstChild);
+    } else {
+      target.appendChild(pageScript);
+    }
 
-  console.log('[NSV] Page script injected with patch URL:', patchUrl);
-} catch (error) {
-  console.error('[NSV] Error injecting page script:', error);
-}
+    console.log('[NSV] Page script injected with patch URL:', patchUrl);
+  } catch (error) {
+    console.error('[NSV] Error injecting page script:', error);
+  }
+});
 
 // Gérer les changements d'URL (SPA)
 try {
@@ -66,10 +81,16 @@ try {
         return;
       }
       if (result.chatCustomization) {
-        (window as any).NSV_SETTINGS = result.chatCustomization;
+        // Convertir l'URL du badge si nécessaire (assets/ path)
+        const settings = { ...result.chatCustomization };
+        if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+          settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
+        }
+        
+        (window as any).NSV_SETTINGS = settings;
         window.dispatchEvent(
           new CustomEvent('NSV_SETTINGS_UPDATED', {
-            detail: result.chatCustomization,
+            detail: settings,
           })
         );
         console.log('[NSV] Chat customization settings sent to page script');
@@ -82,10 +103,16 @@ try {
 
     chrome.storage.onChanged.addListener((changes: any) => {
       if (changes.chatCustomization) {
-        (window as any).NSV_SETTINGS = changes.chatCustomization.newValue;
+        // Convertir l'URL du badge si nécessaire (assets/ path)
+        const settings = { ...changes.chatCustomization.newValue };
+        if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+          settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
+        }
+        
+        (window as any).NSV_SETTINGS = settings;
         window.dispatchEvent(
           new CustomEvent('NSV_SETTINGS_UPDATED', {
-            detail: changes.chatCustomization.newValue,
+            detail: settings,
           })
         );
         console.log('[NSV] Chat customization settings updated');

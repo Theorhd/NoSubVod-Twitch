@@ -28,6 +28,7 @@ fs.mkdirSync('release', { recursive: true });
 fs.mkdirSync('release/dist', { recursive: true });
 fs.mkdirSync('release/assets', { recursive: true });
 fs.mkdirSync('release/assets/icons', { recursive: true });
+fs.mkdirSync('release/assets/badges', { recursive: true });
 
 // 4. Copy necessary files
 const filesToCopy = [
@@ -104,6 +105,22 @@ if (fs.existsSync(assetsDir)) {
     const destPath = path.join('release/assets/icons', file);
     
     if (fs.statSync(srcPath).isFile() && !fs.existsSync(destPath)) {
+      fs.copyFileSync(srcPath, destPath);
+      console.log(`  ✅ ${srcPath}`);
+    }
+  }
+}
+
+// Copy all badges from assets/badges folder
+const badgesDir = 'assets/badges';
+if (fs.existsSync(badgesDir)) {
+  console.log('\n🏅 Copying badge assets:');
+  const files = fs.readdirSync(badgesDir);
+  for (const file of files) {
+    const srcPath = path.join(badgesDir, file);
+    const destPath = path.join('release/assets/badges', file);
+    
+    if (fs.statSync(srcPath).isFile()) {
       fs.copyFileSync(srcPath, destPath);
       console.log(`  ✅ ${srcPath}`);
     }

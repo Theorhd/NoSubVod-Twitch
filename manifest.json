@@ -21,7 +21,8 @@
     {
       "resources": [
         "dist/page-script-entry.js",
-        "dist/patch_amazonworker.js"
+        "dist/patch_amazonworker.js",
+        "assets/badges/*"
       ],
       "matches": [
         "https://*.twitch.tv/*"

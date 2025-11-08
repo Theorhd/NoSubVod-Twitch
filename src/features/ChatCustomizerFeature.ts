@@ -155,7 +155,16 @@ export class ChatCustomizerFeature extends Feature {
       }
     });
     
+    // Try to load settings immediately if already available
     this.initializeSettings();
+    
+    // Also try after a delay in case settings arrive later
+    setTimeout(() => {
+      if ((window as any).NSV_SETTINGS) {
+        this.log('Settings loaded after delay');
+        this.initializeSettings();
+      }
+    }, 500);
   }
 
   private initializeSettings(): void {
@@ -168,6 +177,8 @@ export class ChatCustomizerFeature extends Feature {
       setTimeout(() => {
         this.reprocessAllMessages();
       }, 100);
+    } else {
+      this.log('No settings found in window.NSV_SETTINGS, using defaults');
     }
   }
 
@@ -309,7 +320,13 @@ export class ChatCustomizerFeature extends Feature {
       badge.setAttribute('title', this.settings.myBadgeName);
     }
 
-    if (this.settings.myBadgeText.startsWith('data:image')) {
+    // Check if badge is an image (data URL, relative path, or absolute URL)
+    const badgeText = this.settings.myBadgeText;
+    if (badgeText.startsWith('data:image') || 
+        badgeText.endsWith('.png') || 
+        badgeText.endsWith('.jpg') || 
+        badgeText.endsWith('.gif') || 
+        badgeText.endsWith('.svg')) {
       badge.appendChild(this.createBadgeImage());
     } else {
       badge.appendChild(this.createBadgeText());
@@ -320,6 +337,8 @@ export class ChatCustomizerFeature extends Feature {
 
   private createBadgeImage(): HTMLImageElement {
     const img = document.createElement('img');
+    
+    // L'URL est déjà convertie par le content script
     img.src = this.settings.myBadgeText;
     img.style.cssText = 'width: 18px; height: 18px; object-fit: contain; display: block;';
     

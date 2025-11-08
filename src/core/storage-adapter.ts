@@ -4,35 +4,34 @@
  */
 
 import { FeatureStorage } from './FeatureManager';
-import { storage } from '../utils/storage';
+
+declare const chrome: any;
 
 /**
  * Adaptateur pour utiliser le storage Chrome avec le système de features
  */
 export class ChromeStorageAdapter implements FeatureStorage {
-  private prefix: string;
-
-  constructor(prefix: string = 'nsv_') {
-    this.prefix = prefix;
-  }
-
   async get(key: string): Promise<any> {
-    const settings = await storage.getSettings();
-    const fullKey = this.prefix + key;
-    return (settings as any)[fullKey];
+    return new Promise((resolve) => {
+      chrome.storage.local.get(key, (result: any) => {
+        resolve(result[key]);
+      });
+    });
   }
 
   async set(key: string, value: any): Promise<void> {
-    const settings = await storage.getSettings();
-    const fullKey = this.prefix + key;
-    (settings as any)[fullKey] = value;
-    await storage.saveSettings(settings);
+    return new Promise<void>((resolve) => {
+      chrome.storage.local.set({ [key]: value }, () => {
+        resolve();
+      });
+    });
   }
 
   async remove(key: string): Promise<void> {
-    const settings = await storage.getSettings();
-    const fullKey = this.prefix + key;
-    delete (settings as any)[fullKey];
-    await storage.saveSettings(settings);
+    return new Promise<void>((resolve) => {
+      chrome.storage.local.remove(key, () => {
+        resolve();
+      });
+    });
   }
 }

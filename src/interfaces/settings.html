@@ -133,6 +133,16 @@
         color: #0e0e10;
       }
       
+      .feature-badge.new {
+        background: #ff6b35;
+        color: white;
+      }
+      
+      .feature-badge.beta {
+        background: #ffa500;
+        color: white;
+      }
+      
       .feature-description {
         font-size: 13px;
         color: #adadb8;
@@ -549,6 +559,23 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
+            <div class="feature-name">
+              🚫 Ad Blocker
+              <span class="feature-badge beta">Beta</span>
+            </div>
+            <div class="feature-description">
+              Bloque ou passe automatiquement les publicités Twitch et masque les overlays publicitaires 
+              pour une expérience de visionnage sans interruption.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="feature-ad-blocker" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       </div>
       
       <!-- Chat Customization Section -->
@@ -564,14 +591,14 @@
         <div class="input-group">
           <label class="input-label">Badge Personnalisé</label>
           <div class="info-box">
-            💡 <strong>Astuce :</strong> Vous pouvez utiliser des emojis (👑, ⭐, 🔥) ou du texte personnalisé ([VIP], [DEV])
+            💡 <strong>Astuce :</strong> Choisissez parmi nos badges officiels Twitch (TwitchCon, OWL, Founder...) ou importez votre propre image.
           </div>
           
           <div class="badge-grid" id="badge-presets">
             <!-- Les badges prédéfinis seront ajoutés ici par JS -->
           </div>
           
-          <input type="text" id="chat-badge-text" placeholder="Ex: 👑 ou [VIP] ou laissez vide" style="margin-top: 12px;">
+          <input type="text" id="chat-badge-text" placeholder="Badge sélectionné ou chemin personnalisé" style="margin-top: 12px;" readonly>
         </div>
         
         <div class="input-group">

@@ -687,13 +687,22 @@ async function setupBadgeManager() {
     btn.className = `badge-btn${isSelected ? ' selected' : ''}`;
     btn.type = 'button';
     
-    if (badge.type === 'imported' && badge.content.startsWith('data:')) {
-      // Image importée
+    // Check if badge is an image (data URL or file path)
+    if (badge.content.startsWith('data:') || badge.content.startsWith('assets/') || badge.content.endsWith('.png') || badge.content.endsWith('.jpg') || badge.content.endsWith('.gif')) {
+      // Image (imported or preset)
       const img = document.createElement('img');
-      img.src = badge.content;
+      
+      // Convert relative paths to Chrome extension URLs
+      if (badge.content.startsWith('assets/')) {
+        img.src = chrome.runtime.getURL(badge.content);
+      } else {
+        img.src = badge.content;
+      }
+      
+      img.alt = badge.name;
       btn.appendChild(img);
     } else {
-      // Emoji ou texte
+      // Emoji or text
       btn.textContent = badge.content;
     }
 
@@ -817,6 +826,21 @@ function setupChatCustomization() {
 init();
 setupBadgeManager();
 setupChatCustomization();
+
+// Display version from manifest
+(() => {
+  const versionEl = document.getElementById('version');
+  if (versionEl) {
+    try {
+      const manifest = chrome.runtime.getManifest();
+      if (manifest.version) {
+        versionEl.textContent = 'v' + manifest.version;
+      }
+    } catch (e) {
+      console.error('Could not read manifest version:', e);
+    }
+  }
+})();
 
 // Open settings page
 document.getElementById('openSettings')?.addEventListener('click', () => {

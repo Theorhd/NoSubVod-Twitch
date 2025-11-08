@@ -12,30 +12,22 @@ export interface Badge {
 }
 
 export const PRESET_BADGES: Badge[] = [
-  // Emojis courants
-  { id: 'emoji_crown', type: 'emoji', content: '👑', name: 'Couronne' },
-  { id: 'emoji_star', type: 'emoji', content: '⭐', name: 'Étoile' },
-  { id: 'emoji_heart', type: 'emoji', content: '❤️', name: 'Cœur' },
-  { id: 'emoji_fire', type: 'emoji', content: '🔥', name: 'Feu' },
-  { id: 'emoji_gem', type: 'emoji', content: '💎', name: 'Diamant' },
-  { id: 'emoji_trophy', type: 'emoji', content: '🏆', name: 'Trophée' },
-  { id: 'emoji_bolt', type: 'emoji', content: '⚡', name: 'Éclair' },
-  { id: 'emoji_sword', type: 'emoji', content: '⚔️', name: 'Épée' },
-  { id: 'emoji_shield', type: 'emoji', content: '🛡️', name: 'Bouclier' },
-  { id: 'emoji_dragon', type: 'emoji', content: '🐉', name: 'Dragon' },
-  { id: 'emoji_phoenix', type: 'emoji', content: '🔆', name: 'Phénix' },
-  { id: 'emoji_moon', type: 'emoji', content: '🌙', name: 'Lune' },
-  { id: 'emoji_sun', type: 'emoji', content: '☀️', name: 'Soleil' },
-  { id: 'emoji_snowflake', type: 'emoji', content: '❄️', name: 'Flocon' },
-  { id: 'emoji_wave', type: 'emoji', content: '🌊', name: 'Vague' },
-  { id: 'emoji_skull', type: 'emoji', content: '💀', name: 'Crâne' },
-  
-  // Badges style Twitch
-  { id: 'twitch_bits', type: 'preset', content: '[BITS]', name: 'Bits' },
-  { id: 'twitch_vip', type: 'preset', content: '[VIP]', name: 'VIP' },
-  { id: 'twitch_mod', type: 'preset', content: '[MOD]', name: 'Modérateur' },
-  { id: 'twitch_sub', type: 'preset', content: '[SUB]', name: 'Abonné' },
-  { id: 'twitch_prime', type: 'preset', content: '[PRIME]', name: 'Prime' },
+  // Badges officiels Twitch depuis assets/badges/
+  { id: 'badge_founder', type: 'preset', content: 'assets/badges/Founder.png', name: 'Founder' },
+  { id: 'badge_glhf', type: 'preset', content: 'assets/badges/GLHF Pledge.png', name: 'GLHF Pledge' },
+  { id: 'badge_glitchcon', type: 'preset', content: 'assets/badges/GlitchCon 2020.png', name: 'GlitchCon 2020' },
+  { id: 'badge_anonymous', type: 'preset', content: 'assets/badges/Anonymous Cheerer.png', name: 'Anonymous Cheerer' },
+  { id: 'badge_bits1', type: 'preset', content: 'assets/badges/Bits Leader 1.png', name: 'Bits Leader 1' },
+  { id: 'badge_bits2', type: 'preset', content: 'assets/badges/Bits Leader 2.png', name: 'Bits Leader 2' },
+  { id: 'badge_bits3', type: 'preset', content: 'assets/badges/Bits Leader 3.png', name: 'Bits Leader 3' },
+  { id: 'badge_60seconds', type: 'preset', content: 'assets/badges/60 Seconds!.png', name: '60 Seconds!' },
+  { id: 'badge_okhlos', type: 'preset', content: 'assets/badges/Okhlos.png', name: 'Okhlos' },
+  { id: 'badge_minecraft', type: 'preset', content: 'assets/badges/Minecraft 15th Anniversary Celebration.png', name: 'Minecraft 15th Anniversary' },
+  { id: 'badge_owl2018', type: 'preset', content: 'assets/badges/OWL All-Access Pass 2018.png', name: 'OWL All-Access Pass 2018' },
+  { id: 'badge_owl2019', type: 'preset', content: 'assets/badges/OWL All-Access Pass 2019.png', name: 'OWL All-Access Pass 2019' },
+  { id: 'badge_twitchcon2017', type: 'preset', content: 'assets/badges/TwitchCon 2017 - Long Beach.png', name: 'TwitchCon 2017 - Long Beach' },
+  { id: 'badge_twitchcon2018', type: 'preset', content: 'assets/badges/TwitchCon 2018 - San Jose.png', name: 'TwitchCon 2018 - San Jose' },
+  { id: 'badge_twitchcon2019', type: 'preset', content: 'assets/badges/TwitchCon 2019 - Berlin.png', name: 'TwitchCon 2019 - Berlin' },
 ];
 
 export class BadgeManager {

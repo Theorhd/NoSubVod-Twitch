@@ -14,6 +14,7 @@ interface FeatureSettings {
   'interface-changer': boolean;
   'chat-customizer': boolean;
   'restriction-remover': boolean;
+  'ad-blocker': boolean;
 }
 
 interface ChatCustomizationSettings {
@@ -72,7 +73,8 @@ class SettingsManager {
           'vod-unlocker': true,
           'interface-changer': true,
           'chat-customizer': true,
-          'restriction-remover': true
+          'restriction-remover': true,
+          'ad-blocker': true
         };
         resolve(result.featureSettings || defaults);
       });
@@ -182,26 +184,35 @@ class SettingsManager {
     const container = document.getElementById('badge-presets');
     if (!container) return;
 
-    // Add preset badges
+    // Add preset badges (now images from assets/badges/)
     PRESET_BADGES.forEach(badge => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'badge-btn';
-      btn.textContent = badge.content;
       btn.title = badge.name;
+      
+      // Create image element for badge
+      const img = document.createElement('img');
+      // Convert relative path to Chrome extension URL
+      if (badge.content.startsWith('assets/')) {
+        img.src = chrome.runtime.getURL(badge.content);
+      } else {
+        img.src = badge.content;
+      }
+      img.alt = badge.name;
+      btn.appendChild(img);
       
       btn.addEventListener('click', () => {
         // Deselect all
         container.querySelectorAll('.badge-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         
-        // Update input
+        // Update input with image path (keep relative path for storage)
         (document.getElementById('chat-badge-text') as HTMLInputElement).value = badge.content;
         (document.getElementById('chat-badge-name') as HTMLInputElement).value = badge.name;
         
-        // Clear imported badge
-        this.currentBadgeDataUrl = '';
-        this.hideImportedBadgePreview();
+        // Show preview
+        this.showImportedBadgePreview(badge.content);
       });
       
       container.appendChild(btn);
@@ -316,7 +327,7 @@ class SettingsManager {
   /**
    * Show imported badge preview
    */
-  private showImportedBadgePreview(dataUrl: string): void {
+  private showImportedBadgePreview(imageSrc: string): void {
     const container = document.getElementById('badge-imported-container');
     const preview = document.getElementById('badge-preview');
     
@@ -324,7 +335,14 @@ class SettingsManager {
 
     preview.innerHTML = '';
     const img = document.createElement('img');
-    img.src = dataUrl;
+    
+    // Convert relative paths to Chrome extension URLs for display
+    if (imageSrc.startsWith('assets/')) {
+      img.src = chrome.runtime.getURL(imageSrc);
+    } else {
+      img.src = imageSrc;
+    }
+    
     preview.appendChild(img);
     
     container.style.display = 'block';
@@ -350,7 +368,8 @@ class SettingsManager {
         'vod-unlocker': (document.getElementById('feature-vod-unlocker') as HTMLInputElement).checked,
         'interface-changer': (document.getElementById('feature-interface-changer') as HTMLInputElement).checked,
         'chat-customizer': (document.getElementById('feature-chat-customizer') as HTMLInputElement).checked,
-        'restriction-remover': (document.getElementById('feature-restriction-remover') as HTMLInputElement).checked
+        'restriction-remover': (document.getElementById('feature-restriction-remover') as HTMLInputElement).checked,
+        'ad-blocker': (document.getElementById('feature-ad-blocker') as HTMLInputElement).checked
       };
 
       await new Promise<void>((resolve) => {
@@ -487,4 +506,17 @@ class SettingsManager {
 document.addEventListener('DOMContentLoaded', () => {
   const manager = new SettingsManager();
   manager.init();
+  
+  // Display version from manifest
+  const versionEl = document.getElementById('version');
+  if (versionEl) {
+    try {
+      const manifest = chrome.runtime.getManifest();
+      if (manifest.version) {
+        versionEl.textContent = 'v' + manifest.version;
+      }
+    } catch (e) {
+      console.error('[NSV Settings] Could not read manifest version:', e);
+    }
+  }
 });
