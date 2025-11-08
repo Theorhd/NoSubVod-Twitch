@@ -239,15 +239,26 @@ export class AdBlockerFeature extends Feature {
   }
 
   private processNode(node: Element): void {
+    // Liste des sélecteurs à masquer (exclure le conteneur vidéo)
+    const adSelectorsToHide = [
+      this.AD_SELECTORS.adOverlay,
+      this.AD_SELECTORS.adContainer,
+      this.AD_SELECTORS.adInProgress,
+      this.AD_SELECTORS.adCountdown,
+      this.AD_SELECTORS.adBanner,
+      this.AD_SELECTORS.skipButton,
+      this.AD_SELECTORS.adCloseButton,
+    ];
+    
     // Vérifier si c'est un élément publicitaire
-    Object.values(this.AD_SELECTORS).forEach(selector => {
+    adSelectorsToHide.forEach(selector => {
       if (node.matches && node.matches(selector)) {
         this.hideAdElement(node);
       }
     });
     
     // Vérifier les enfants
-    Object.values(this.AD_SELECTORS).forEach(selector => {
+    adSelectorsToHide.forEach(selector => {
       const adElements = node.querySelectorAll(selector);
       adElements.forEach(el => this.hideAdElement(el));
     });
@@ -287,7 +298,18 @@ export class AdBlockerFeature extends Feature {
   }
 
   private hideAdOverlays(): void {
-    Object.values(this.AD_SELECTORS).forEach(selector => {
+    // Masquer uniquement les éléments publicitaires, PAS le conteneur vidéo principal
+    const adSelectorsToHide = [
+      this.AD_SELECTORS.adOverlay,
+      this.AD_SELECTORS.adContainer,
+      this.AD_SELECTORS.adInProgress,
+      this.AD_SELECTORS.adCountdown,
+      this.AD_SELECTORS.adBanner,
+      this.AD_SELECTORS.skipButton,
+      this.AD_SELECTORS.adCloseButton,
+    ];
+    
+    adSelectorsToHide.forEach(selector => {
       const elements = document.querySelectorAll(selector);
       elements.forEach(el => this.hideAdElement(el));
     });
@@ -295,6 +317,14 @@ export class AdBlockerFeature extends Feature {
 
   private hideAdElement(element: Element): void {
     const htmlElement = element as HTMLElement;
+    
+    // Ne JAMAIS cacher le conteneur vidéo principal ou l'élément vidéo
+    if (htmlElement.matches('.video-player__container') || 
+        htmlElement.matches('.video-player') ||
+        htmlElement.tagName === 'VIDEO') {
+      return;
+    }
+    
     if (htmlElement.style.display !== 'none') {
       htmlElement.style.display = 'none';
       htmlElement.style.opacity = '0';

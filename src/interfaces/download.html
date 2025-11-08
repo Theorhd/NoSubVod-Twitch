@@ -1,106 +1,65 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NoSubVod - Téléchargement</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 20px;
-    }
-    .container {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border-radius: 16px;
-      padding: 40px;
-      max-width: 500px;
-      text-align: center;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-    }
-    h1 {
-      margin: 0 0 20px 0;
-      font-size: 24px;
-      font-weight: 600;
-    }
-    .info {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 8px;
-      padding: 15px;
-      margin: 20px 0;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-    .btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border: 2px solid white;
-      color: white;
-      font-size: 16px;
-      font-weight: 600;
-      padding: 15px 40px;
-      border-radius: 50px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-      margin: 10px 0;
-    }
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    }
-    .btn:active {
-      transform: translateY(0);
-    }
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .progress-container {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 8px;
-      height: 40px;
-      margin: 20px 0;
-      overflow: hidden;
-      position: relative;
-      display: none;
-    }
-    .progress-bar {
-      background: linear-gradient(90deg, #4ade80, #22c55e);
-      height: 100%;
-      width: 0%;
-      transition: width 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 14px;
-    }
-    .status {
-      margin-top: 15px;
-      font-size: 14px;
-      opacity: 0.9;
-    }
-    .hidden {
-      display: none;
-    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #0e0e10; color: #e3e3e3; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+    .container { background: linear-gradient(135deg, #18181b 0%, #0e0e10 100%); border: 2px solid #2f2f37; border-radius: 16px; padding: 40px; max-width: 600px; width: 100%; text-align: center; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); transition: all 0.3s ease; }
+    .container:hover { border-color: #9146FF; box-shadow: 0 12px 40px rgba(145, 70, 255, 0.2); }
+    .header { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 30px; }
+    .header img { width: 48px; height: 48px; filter: drop-shadow(0 0 12px rgba(145, 70, 255, 0.6)); }
+    h1 { margin: 0; font-size: 28px; font-weight: 700; background: linear-gradient(90deg, #9146FF, #b366ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .icon-large { font-size: 64px; margin-bottom: 20px; filter: drop-shadow(0 4px 8px rgba(145, 70, 255, 0.3)); }
+    .info { background: #18181b; border: 1px solid #2f2f37; border-radius: 12px; padding: 20px; margin: 24px 0; font-size: 15px; line-height: 1.6; color: #adadb8; }
+    .info strong { color: #e3e3e3; display: block; margin-bottom: 8px; font-size: 16px; }
+    .info code { background: #0e0e10; padding: 2px 6px; border-radius: 4px; color: #9146FF; font-family: monospace; font-size: 13px; }
+    .btn { width: 100%; background: linear-gradient(135deg, #9146FF, #b366ff); border: none; color: white; font-size: 16px; font-weight: 600; padding: 16px 40px; border-radius: 12px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 16px rgba(145, 70, 255, 0.3); margin: 12px 0; }
+    .btn:hover:not(:disabled) { background: linear-gradient(135deg, #a45fff, #c589f5); transform: translateY(-2px); box-shadow: 0 6px 24px rgba(145, 70, 255, 0.4); }
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; background: #2f2f37; box-shadow: none; }
+    .progress-container { background: #18181b; border: 1px solid #2f2f37; border-radius: 12px; padding: 20px; margin: 24px 0; display: none; }
+    .progress-container.visible { display: block; animation: fadeIn 0.3s ease; }
+    .progress-text { font-size: 24px; font-weight: 700; color: #9146FF; margin-bottom: 16px; }
+    .progress-bar-wrapper { width: 100%; height: 12px; background: #0e0e10; border-radius: 6px; overflow: hidden; margin-bottom: 16px; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3); }
+    .progress-bar { background: linear-gradient(90deg, #9146FF, #b366ff); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 6px; box-shadow: 0 0 12px rgba(145, 70, 255, 0.6); position: relative; overflow: hidden; }
+    .progress-bar::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent); animation: shimmer 2s infinite; }
+    @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    .progress-details { font-size: 13px; color: #adadb8; display: flex; justify-content: space-between; margin-top: 8px; }
+    .status { margin-top: 20px; font-size: 14px; color: #adadb8; padding: 12px; background: #18181b; border-radius: 8px; border: 1px solid #2f2f37; }
+    .status.success { color: #4caf50; border-color: #4caf50; background: rgba(76, 175, 80, 0.1); }
+    .status.error { color: #ff8484; border-color: #ff8484; background: rgba(255, 132, 132, 0.1); }
+    .hidden { display: none !important; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    ::-webkit-scrollbar { width: 12px; }
+    ::-webkit-scrollbar-track { background: #0e0e10; }
+    ::-webkit-scrollbar-thumb { background: #2f2f37; border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>📥 Téléchargement VOD</h1>
+    <div class="header">
+      <img src="../../assets/icons/icon.png" alt="NoSubVod Icon">
+      <h1>Téléchargement VOD</h1>
+    </div>
+    <div class="icon-large">📥</div>
     <div class="info" id="info">
-      <strong>Prêt à télécharger votre VOD !</strong><br>
+      <strong>Prêt à télécharger votre VOD !</strong>
       Cliquez sur le bouton ci-dessous pour choisir où enregistrer le fichier.
     </div>
-    <button class="btn" id="startBtn">� Choisir l'emplacement et télécharger</button>
+    <button class="btn" id="startBtn">💾 Choisir l'emplacement et télécharger</button>
     <div class="progress-container" id="progressContainer">
-      <div class="progress-bar" id="progressBar">0%</div>
+      <div class="progress-text" id="progressText">0%</div>
+      <div class="progress-bar-wrapper">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="progress-details">
+        <span id="progressSpeed">Calcul...</span>
+        <span id="progressTime">Temps restant: --</span>
+      </div>
     </div>
     <div class="status" id="status"></div>
   </div>

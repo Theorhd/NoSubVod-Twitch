@@ -10,16 +10,27 @@ const infoEl = document.getElementById('info') as HTMLElement;
 const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
 const progressContainer = document.getElementById('progressContainer') as HTMLElement;
 const progressBar = document.getElementById('progressBar') as HTMLElement;
+const progressText = document.getElementById('progressText') as HTMLElement;
+const progressSpeed = document.getElementById('progressSpeed') as HTMLElement;
+const progressTime = document.getElementById('progressTime') as HTMLElement;
 
-function updateStatus(message: string) {
+function updateStatus(message: string, type: 'info' | 'success' | 'error' = 'info') {
   statusEl.textContent = message;
+  statusEl.classList.remove('hidden', 'success', 'error');
+  if (type === 'success') {
+    statusEl.classList.add('success');
+  } else if (type === 'error') {
+    statusEl.classList.add('error');
+  }
   console.log('[NoSubVod Download]', message);
 }
 
 function updateProgress(current: number, total: number) {
   const percent = Math.round((current / total) * 100);
   progressBar.style.width = percent + '%';
-  progressBar.textContent = percent + '%';
+  if (progressText) {
+    progressText.textContent = percent + '%';
+  }
 }
 
 // Get download info from URL params (parsed once)
@@ -29,7 +40,7 @@ const filename = params.get('filename');
 const segmentCountStr = params.get('segmentCount');
 
 if (!downloadId || !filename || !segmentCountStr) {
-  updateStatus('❌ Paramètres manquants');
+  updateStatus('❌ Paramètres manquants', 'error');
   startBtn.disabled = true;
 } else {
   const segmentCount = parseInt(segmentCountStr);
@@ -55,7 +66,7 @@ async function downloadWithAnchor(blobUrl: string, filename: string, downloadId:
   a.click();
   
   console.log('[NoSubVod Download] Fallback download triggered');
-  updateStatus('✅ Téléchargement démarré ! Gardez cette page ouverte.');
+  updateStatus('✅ Téléchargement démarré ! Gardez cette page ouverte.', 'success');
   
   // Keep blob URL alive for 3 minutes
   setTimeout(() => {
@@ -92,6 +103,7 @@ startBtn.addEventListener('click', async () => {
     updateStatus('Chargement des segments...');
     infoEl.classList.add('hidden');
     progressContainer.style.display = 'block';
+    progressContainer.classList.add('visible');
     
     // Retrieve all segments from IndexedDB
     const buffers: ArrayBuffer[] = [];
@@ -110,6 +122,9 @@ startBtn.addEventListener('click', async () => {
       
       if ((i + 1) % 50 === 0 || i === segmentCount - 1) {
         console.log(`[NoSubVod Download] Loaded ${i + 1}/${segmentCount} segments`);
+        if (progressSpeed) {
+          progressSpeed.textContent = `${i + 1}/${segmentCount} segments`;
+        }
       }
     }
     
@@ -144,7 +159,7 @@ startBtn.addEventListener('click', async () => {
       });
       
       console.log('[NoSubVod Download] Chrome download started with ID:', chromeDownloadId);
-      updateStatus('✅ Téléchargement démarré ! Ne fermez pas cette page.');
+      updateStatus('✅ Téléchargement démarré ! Ne fermez pas cette page.', 'success');
       
       // Monitor download progress
       const checkInterval = setInterval(() => {
@@ -156,7 +171,7 @@ startBtn.addEventListener('click', async () => {
               clearInterval(checkInterval);
               console.log('[NoSubVod Download] Download completed successfully');
               URL.revokeObjectURL(blobUrl);
-              updateStatus('✅ Téléchargement terminé !');
+              updateStatus('✅ Téléchargement terminé !', 'success');
               
               // Clean up IndexedDB
               await dbHelper.deleteDownload(downloadId, segmentCount);
@@ -193,10 +208,12 @@ startBtn.addEventListener('click', async () => {
     console.error('[NoSubVod Download] Error:', error);
     
     progressContainer.style.display = 'none';
+    progressContainer.classList.remove('visible');
     startBtn.classList.remove('hidden');
     startBtn.disabled = false;
+    infoEl.classList.remove('hidden');
     
-    updateStatus('❌ Erreur : ' + error.message);
+    updateStatus('❌ Erreur : ' + error.message, 'error');
     
     if (downloadId && segmentCountStr) {
       // Clean up IndexedDB even on error
