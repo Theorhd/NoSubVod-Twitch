@@ -18,6 +18,7 @@ export interface VodDownload {
 
 export interface Settings {
   defaultQuality: string; // '1080p60', '720p60', etc.
+  defaultFileFormat: 'ts' | 'mp4';
   enableNotifications: boolean;
   autoCleanupDays: number; // 0 = disabled
   showThumbnails: boolean;
@@ -43,6 +44,7 @@ export interface ActiveDownload {
 
 const DEFAULT_SETTINGS: Settings = {
   defaultQuality: 'Source',
+  defaultFileFormat: 'ts',
   enableNotifications: true,
   autoCleanupDays: 30,
   showThumbnails: true,

@@ -38,6 +38,7 @@ const params = new URLSearchParams(window.location.search);
 const downloadId = params.get('downloadId');
 const filename = params.get('filename');
 const segmentCountStr = params.get('segmentCount');
+const fileFormat = (params.get('fileFormat') || 'ts') as 'ts' | 'mp4';
 
 if (!downloadId || !filename || !segmentCountStr) {
   updateStatus('❌ Paramètres manquants', 'error');
@@ -105,34 +106,51 @@ startBtn.addEventListener('click', async () => {
     progressContainer.style.display = 'block';
     progressContainer.classList.add('visible');
     
-    // Retrieve all segments from IndexedDB
-    const buffers: ArrayBuffer[] = [];
+    // Load and concatenate segments in batches to avoid memory overflow
+    const BATCH_SIZE = 100; // Process 100 segments at a time
+    const blobParts: Blob[] = [];
     
-    for (let i = 0; i < segmentCount; i++) {
-      const segment = await dbHelper.getSegment(downloadId, i);
+    for (let batchStart = 0; batchStart < segmentCount; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, segmentCount);
+      const batchBuffers: ArrayBuffer[] = [];
       
-      if (!segment) {
-        console.warn(`[NoSubVod Download] Segment ${i} not found, skipping`);
-        continue;
+      // Load one batch
+      for (let i = batchStart; i < batchEnd; i++) {
+        const segment = await dbHelper.getSegment(downloadId, i);
+        
+        if (!segment) {
+          console.warn(`[NoSubVod Download] Segment ${i} not found, skipping`);
+          continue;
+        }
+        
+        batchBuffers.push(segment);
+        
+        updateProgress(i + 1, segmentCount);
+        
+        if ((i + 1) % 50 === 0 || i === segmentCount - 1) {
+          console.log(`[NoSubVod Download] Loaded ${i + 1}/${segmentCount} segments`);
+          if (progressSpeed) {
+            progressSpeed.textContent = `${i + 1}/${segmentCount} segments`;
+          }
+        }
       }
       
-      buffers.push(segment);
-      
-      updateProgress(i + 1, segmentCount);
-      
-      if ((i + 1) % 50 === 0 || i === segmentCount - 1) {
-        console.log(`[NoSubVod Download] Loaded ${i + 1}/${segmentCount} segments`);
-        if (progressSpeed) {
-          progressSpeed.textContent = `${i + 1}/${segmentCount} segments`;
-        }
+      // Create a blob for this batch and add it to parts
+      if (batchBuffers.length > 0) {
+        const batchBlob = new Blob(batchBuffers, { type: 'video/mp2t' });
+        blobParts.push(batchBlob);
+        console.log(`[NoSubVod Download] Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} processed`);
       }
     }
     
     updateStatus('Création du fichier...');
     
-    // Create blob from all segments
-    const blob = new Blob(buffers, { type: 'video/mp2t' });
-    console.log(`[NoSubVod Download] Blob created, size: ${blob.size}`);
+    // Determine MIME type based on format
+    const mimeType = fileFormat === 'mp4' ? 'video/mp4' : 'video/mp2t';
+    
+    // Create final blob from all batch blobs
+    const blob = new Blob(blobParts, { type: mimeType });
+    console.log(`[NoSubVod Download] Final blob created (${fileFormat}), size: ${blob.size}`);
     
     updateStatus('Préparation du téléchargement...');
     

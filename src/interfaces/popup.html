@@ -161,7 +161,11 @@
           <select id="quality"></select>
         </div>
         <div class="row">
-          <button id="downloadBtn" disabled>Télécharger la VOD (.ts)</button>
+          <select id="fileFormat" style="width:48%; margin-right:4%;">
+            <option value="ts">Format TS (MPEG-TS)</option>
+            <option value="mp4">Format MP4 (expérimental)</option>
+          </select>
+          <button id="downloadBtn" disabled style="width:48%;">Télécharger la VOD</button>
         </div>
         <div class="row">
           <input id="customUrl" type="text" placeholder="Ou collez une URL vidéo directe…">
@@ -200,6 +204,16 @@
             <option value="720p60">720p60</option>
             <option value="480p30">480p30</option>
             <option value="360p30">360p30</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <div>
+            <div class="setting-label">Format par défaut</div>
+            <div class="setting-desc">Format de fichier présélectionné</div>
+          </div>
+          <select id="settingDefaultFileFormat" style="width: 120px;">
+            <option value="ts">TS (MPEG-TS)</option>
+            <option value="mp4">MP4</option>
           </select>
         </div>
         <div class="setting-item">

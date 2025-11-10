@@ -239,6 +239,7 @@ async function loadSettings(): Promise<void> {
   const settings = await storage.getSettings();
 
   (document.getElementById('settingDefaultQuality') as HTMLSelectElement).value = settings.defaultQuality;
+  (document.getElementById('settingDefaultFileFormat') as HTMLSelectElement).value = settings.defaultFileFormat;
   (document.getElementById('settingChunkSize') as HTMLInputElement).value = settings.downloadChunkSize.toString();
   (document.getElementById('settingNotifications') as HTMLInputElement).checked = settings.enableNotifications;
   (document.getElementById('settingThumbnails') as HTMLInputElement).checked = settings.showThumbnails;
@@ -249,6 +250,7 @@ async function loadSettings(): Promise<void> {
 async function saveSettings(): Promise<void> {
   const settings: Partial<Settings> = {
     defaultQuality: (document.getElementById('settingDefaultQuality') as HTMLSelectElement).value,
+    defaultFileFormat: (document.getElementById('settingDefaultFileFormat') as HTMLSelectElement).value as 'ts' | 'mp4',
     downloadChunkSize: parseInt((document.getElementById('settingChunkSize') as HTMLInputElement).value),
     enableNotifications: (document.getElementById('settingNotifications') as HTMLInputElement).checked,
     showThumbnails: (document.getElementById('settingThumbnails') as HTMLInputElement).checked,
@@ -265,7 +267,7 @@ async function saveSettings(): Promise<void> {
   }, 3000);
 }
 
-async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: string): Promise<void> {
+async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: string, fileFormat: 'ts' | 'mp4'): Promise<void> {
   const progressContainer = document.getElementById('progressContainer')!;
   const progressFill = document.getElementById('progressFill')!;
   const progressPercent = document.getElementById('progressPercent')!;
@@ -294,6 +296,7 @@ async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: stri
         playlistUrl,
         vodInfo,
         qualityLabel,
+        fileFormat,
         clipStart: parseTime(startTimeInput.value) ?? 0,
         clipEnd: parseTime(endTimeInput.value) ?? Infinity
       },
@@ -624,6 +627,12 @@ async function init(): Promise<void> {
     status.style.display = 'none';
     content.style.display = 'block';
     
+    // Apply default file format from settings
+    const fileFormatSelect = document.getElementById('fileFormat') as HTMLSelectElement;
+    if (settings.defaultFileFormat) {
+      fileFormatSelect.value = settings.defaultFileFormat;
+    }
+    
     if (settings.defaultQuality && candidates.length > 0) {
       const defaultCandidate = candidates.find(c => c.label === settings.defaultQuality);
       if (defaultCandidate) {
@@ -643,7 +652,10 @@ async function init(): Promise<void> {
       const selectedOption = qualitySel.options[qualitySel.selectedIndex];
       const qualityLabel = selectedOption.textContent || 'Unknown';
       
-      await downloadVod(playlistUrl, video, qualityLabel);
+      const fileFormatSelect = document.getElementById('fileFormat') as HTMLSelectElement;
+      const fileFormat = (fileFormatSelect.value as 'ts' | 'mp4') || 'ts';
+      
+      await downloadVod(playlistUrl, video, qualityLabel, fileFormat);
     });
 
     btnDirect.addEventListener('click', async () => {
@@ -656,7 +668,9 @@ async function init(): Promise<void> {
       successEl.textContent = '';
       
       if (url.endsWith('.m3u8')) {
-        await downloadVod(url, { id: 'custom', title: 'Custom VOD', owner: { login: 'unknown' }, lengthSeconds: 0 }, 'Custom');
+        const fileFormatSelect = document.getElementById('fileFormat') as HTMLSelectElement;
+        const fileFormat = (fileFormatSelect.value as 'ts' | 'mp4') || 'ts';
+        await downloadVod(url, { id: 'custom', title: 'Custom VOD', owner: { login: 'unknown' }, lengthSeconds: 0 }, 'Custom', fileFormat);
       } else {
         chrome.downloads.download({ url, saveAs: true }, () => {
           successEl.textContent = '✅ Téléchargement lancé !';

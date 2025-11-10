@@ -10,6 +10,7 @@ interface DownloadRequest {
   playlistUrl: string;
   vodInfo: any;
   qualityLabel: string;
+  fileFormat?: 'ts' | 'mp4';
   clipStart?: number;
   clipEnd?: number;
 }
@@ -33,6 +34,7 @@ const downloadMetadata = new Map<string, {
   totalBytes: number;
   failedCount: number;
   segmentCount: number;
+  fileFormat: 'ts' | 'mp4';
 }>();
 
 function showNotification(title: string, message: string) {
@@ -64,6 +66,7 @@ async function downloadVod(
   playlistUrl: string,
   vodInfo: any,
   qualityLabel: string,
+  fileFormat: 'ts' | 'mp4' = 'ts',
   clipStart: number = 0,
   clipEnd: number = Infinity,
   sendResponse: (response: any) => void
@@ -123,13 +126,29 @@ async function downloadVod(
       throw new Error('Aucun segment trouvé dans la plage spécifiée');
     }
 
+    // Check storage quota before starting download
+    const estimatedSize = segmentUrls.length * 1024 * 1024; // Rough estimate: 1MB per segment
+    try {
+      const quotaInfo = await dbHelper.checkStorageQuota();
+      console.log(`[NoSubVod] Storage quota - Usage: ${formatBytes(quotaInfo.usage)}, Available: ${formatBytes(quotaInfo.available)}`);
+      
+      if (quotaInfo.available < estimatedSize && quotaInfo.available !== Infinity) {
+        const needed = formatBytes(estimatedSize);
+        const available = formatBytes(quotaInfo.available);
+        throw new Error(`Espace de stockage insuffisant. Requis: ~${needed}, Disponible: ${available}`);
+      }
+    } catch (quotaError: any) {
+      console.warn('[NoSubVod] Could not check storage quota:', quotaError.message);
+      // Continue anyway if quota check fails
+    }
 
-    const buffers: ArrayBuffer[] = [];
+
     let failedCount = 0;
     let totalBytes = 0;
+    let successfulSegments = 0;
     const downloadStartTime = Date.now();
 
-    // Download segments
+    // Download and store segments directly to IndexedDB (avoid memory overflow)
     for (let i = 0; i < segmentUrls.length; i++) {
       // Check if download was aborted or paused
       const downloadState = activeDownloads.get(downloadId);
@@ -161,8 +180,16 @@ async function downloadVod(
           continue;
         }
         const buf = await segResp.arrayBuffer();
-        buffers.push(buf);
+        
+        // Store directly to IndexedDB to avoid memory overflow
+        await dbHelper.storeSegment(downloadId, successfulSegments, buf);
+        successfulSegments++;
         totalBytes += buf.byteLength;
+        
+        // Log storage progress periodically
+        if (successfulSegments % 50 === 0 || i === segmentUrls.length - 1) {
+          console.log(`[NoSubVod] Stored ${successfulSegments} segments in IndexedDB (${formatBytes(totalBytes)})`);
+        }
 
         // Send progress update
         const elapsed = (Date.now() - downloadStartTime) / 1000;
@@ -196,7 +223,7 @@ async function downloadVod(
       }
     }
 
-    if (buffers.length === 0) {
+    if (successfulSegments === 0) {
       throw new Error('Aucun segment n\'a pu être téléchargé');
     }
 
@@ -207,18 +234,7 @@ async function downloadVod(
       ? vodInfo.previewThumbnailURL || getThumbnailUrl(vodInfo.id) 
       : '';
     
-    console.log('[NoSubVod] Storing', buffers.length, 'segments in IndexedDB...');
-    
-    // Store each segment in IndexedDB (avoids message size limits and base64 encoding issues)
-    for (let i = 0; i < buffers.length; i++) {
-      await dbHelper.storeSegment(downloadId, i, buffers[i]);
-      
-      if (i % 10 === 0 || i === buffers.length - 1) {
-        console.log(`[NoSubVod] Stored ${i + 1}/${buffers.length} segments`);
-      }
-    }
-    
-    console.log('[NoSubVod] All segments stored in IndexedDB');
+    console.log('[NoSubVod] All segments already stored in IndexedDB');
     
     // Store metadata for completion handling
     downloadMetadata.set(downloadId, {
@@ -227,14 +243,20 @@ async function downloadVod(
       thumbnail,
       totalBytes,
       failedCount,
-      segmentCount: buffers.length
+      segmentCount: successfulSegments,
+      fileFormat
     });
+    
+    // Determine file extension based on format
+    const fileExtension = fileFormat === 'mp4' ? 'mp4' : 'ts';
+    const filename = `twitch_vod_${vodInfo.id}.${fileExtension}`;
     
     // Open download page (this has user context for showSaveFilePicker)
     const downloadUrl = chrome.runtime.getURL('dist/download.html') +
       `?downloadId=${encodeURIComponent(downloadId)}` +
-      `&filename=${encodeURIComponent(`twitch_vod_${vodInfo.id}.ts`)}` +
-      `&segmentCount=${buffers.length}`;
+      `&filename=${encodeURIComponent(filename)}` +
+      `&segmentCount=${successfulSegments}` +
+      `&fileFormat=${encodeURIComponent(fileFormat)}`;
     
     chrome.tabs.create({ url: downloadUrl });
 
@@ -284,6 +306,7 @@ chrome.runtime.onMessage.addListener(
         req.playlistUrl,
         req.vodInfo,
         req.qualityLabel,
+        req.fileFormat ?? 'ts',
         req.clipStart ?? 0,
         req.clipEnd ?? Infinity,
         sendResponse

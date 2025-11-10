@@ -1,4 +1,6 @@
 // Helper for IndexedDB operations
+// IndexedDB has browser-dependent storage limits (typically ~60% of available disk space in Chrome)
+// For large downloads (1400+ segments ~1.4GB+), ensure sufficient disk space is available
 export class IndexedDBHelper {
   private dbName = 'NoSubVodDB';
   private storeName = 'downloads';
@@ -34,7 +36,15 @@ export class IndexedDBHelper {
       const request = store.put({ id: key, buffer });
 
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+        const error = request.error;
+        // Check for quota exceeded errors
+        if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+          reject(new Error('Quota de stockage dépassé. Libérez de l\'espace disque et réessayez.'));
+        } else {
+          reject(error);
+        }
+      };
     });
   }
 
@@ -71,5 +81,18 @@ export class IndexedDBHelper {
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });
+  }
+
+  // Check storage quota (returns estimated available space in bytes)
+  async checkStorageQuota(): Promise<{ usage: number; quota: number; available: number }> {
+    if ('storage' in navigator && 'estimate' in navigator.storage) {
+      const estimate = await navigator.storage.estimate();
+      const usage = estimate.usage || 0;
+      const quota = estimate.quota || 0;
+      const available = quota - usage;
+      return { usage, quota, available };
+    }
+    // Fallback if storage API not available
+    return { usage: 0, quota: Infinity, available: Infinity };
   }
 }
