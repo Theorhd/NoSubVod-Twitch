@@ -2,6 +2,7 @@ declare const chrome: any;
 
 import { storage, VodDownload, ActiveDownload } from '../utils/storage';
 import { IndexedDBHelper } from '../utils/indexed-db-helper';
+import { VideoCompressor } from '../utils/video-compressor';
 
 const dbHelper = new IndexedDBHelper();
 
@@ -91,6 +92,14 @@ async function downloadVod(
   await storage.setActiveDownload(activeDownload);
 
   try {
+  // Get settings for compression option
+  const userSettings = await storage.getSettings();
+  const shouldCompress = userSettings.compressVideo;
+  
+  if (shouldCompress) {
+    console.log('[NoSubVod] Video compression enabled - files will be smaller but download may be slower');
+  }
+  
   // Fetch playlist
   const resp = await fetch(playlistUrl);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -179,7 +188,19 @@ async function downloadVod(
           failedCount++;
           continue;
         }
-        const buf = await segResp.arrayBuffer();
+        let buf = await segResp.arrayBuffer();
+        
+        // Compress segment if compression is enabled
+        if (shouldCompress && VideoCompressor.shouldCompress(buf.byteLength)) {
+          const originalSize = buf.byteLength;
+          buf = await VideoCompressor.compressSegment(buf);
+          const compressedSize = buf.byteLength;
+          const savings = originalSize - compressedSize;
+          
+          if (successfulSegments === 0) {
+            console.log(`[NoSubVod] First segment compressed: ${formatBytes(originalSize)} → ${formatBytes(compressedSize)} (saved ${formatBytes(savings)})`);
+          }
+        }
         
         // Store directly to IndexedDB to avoid memory overflow
         await dbHelper.storeSegment(downloadId, successfulSegments, buf);
@@ -227,7 +248,14 @@ async function downloadVod(
       throw new Error('Aucun segment n\'a pu être téléchargé');
     }
 
-    console.log('[NoSubVod] All segments downloaded, total size:', totalBytes);
+    console.log('[NoSubVod] All segments downloaded, total size:', formatBytes(totalBytes));
+    
+    if (shouldCompress) {
+      const estimatedOriginalSize = segmentUrls.length * 1024 * 1024; // ~1MB per segment
+      const savings = estimatedOriginalSize - totalBytes;
+      const savingsPercent = Math.round((savings / estimatedOriginalSize) * 100);
+      console.log(`[NoSubVod] Compression enabled - estimated space saved: ${formatBytes(savings)} (~${savingsPercent}%)`);
+    }
 
     const settings = await storage.getSettings();
     const thumbnail = settings.showThumbnails 

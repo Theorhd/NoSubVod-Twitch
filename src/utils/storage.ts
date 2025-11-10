@@ -26,6 +26,7 @@ export interface Settings {
   downloadChunkSize: number;
   theme: 'dark' | 'light' | 'auto';
   debugMode: boolean;
+  compressVideo: boolean; // Compress video to reduce file size
 }
 
 export interface ActiveDownload {
@@ -51,7 +52,8 @@ const DEFAULT_SETTINGS: Settings = {
   maxHistoryItems: 100,
   downloadChunkSize: 5,
   theme: 'dark',
-  debugMode: false
+  debugMode: false,
+  compressVideo: true
 };
 
 class StorageManager {

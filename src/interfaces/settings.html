@@ -672,6 +672,28 @@
         
         <div class="feature-item">
           <div class="feature-info">
+            <div class="feature-name">
+              🗜️ Compression Vidéo
+              <span class="feature-badge new">Nouveau</span>
+            </div>
+            <div class="feature-description">
+              Compresse la vidéo pendant le téléchargement pour réduire la taille du fichier d'environ 30-50%. 
+              Le processus sera plus lent mais économisera beaucoup d'espace disque.
+            </div>
+            <div class="info-box" style="margin-top: 8px;">
+              ⚙️ <strong>Comment ça marche ?</strong> Supprime les paquets de remplissage (null packets) 
+              du stream MPEG-TS pour réduire la taille sans perte de qualité vidéo visible.
+              Typiquement ~15% de réduction pour un VOD standard.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="download-compress">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-info">
             <div class="feature-name">Notifications</div>
             <div class="feature-description">
               Recevoir une notification à la fin des téléchargements

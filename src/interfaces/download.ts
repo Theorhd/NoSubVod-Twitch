@@ -2,6 +2,7 @@
 declare const chrome: any;
 
 import { IndexedDBHelper } from '../utils/indexed-db-helper';
+import { storage } from '../utils/storage';
 
 const dbHelper = new IndexedDBHelper();
 
@@ -47,12 +48,19 @@ if (!downloadId || !filename || !segmentCountStr) {
   const segmentCount = parseInt(segmentCountStr);
   const fileSizeMB = Math.round(segmentCount * 9.4); // Approximation
   
-  infoEl.innerHTML = `
-    <strong>Prêt à télécharger votre VOD !</strong><br>
-    Fichier : <code>${filename}</code><br>
-    Taille approximative : <strong>${fileSizeMB} MB</strong><br>
-    Segments : <strong>${segmentCount}</strong>
-  `;
+  // Check if compression was used
+  storage.getSettings().then(settings => {
+    const compressionNote = settings.compressVideo 
+      ? '<br><span style="color: #4caf50;">🗜️ Compression activée - taille réduite d\'environ 15%</span>' 
+      : '';
+    
+    infoEl.innerHTML = `
+      <strong>Prêt à télécharger votre VOD !</strong><br>
+      Fichier : <code>${filename}</code><br>
+      Taille approximative : <strong>${fileSizeMB} MB</strong><br>
+      Segments : <strong>${segmentCount}</strong>${compressionNote}
+    `;
+  });
 }
 
 // Fallback download function using <a download>

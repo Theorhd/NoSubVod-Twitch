@@ -117,6 +117,7 @@ class SettingsManager {
   private applyGeneralSettings(settings: Settings): void {
     (document.getElementById('download-quality') as HTMLSelectElement).value = settings.defaultQuality;
     (document.getElementById('download-chunks') as HTMLInputElement).value = settings.downloadChunkSize.toString();
+    (document.getElementById('download-compress') as HTMLInputElement).checked = settings.compressVideo || false;
     (document.getElementById('download-notifications') as HTMLInputElement).checked = settings.enableNotifications;
     (document.getElementById('download-thumbnails') as HTMLInputElement).checked = settings.showThumbnails;
     (document.getElementById('history-max') as HTMLInputElement).value = settings.maxHistoryItems.toString();
@@ -380,6 +381,7 @@ class SettingsManager {
       const settings: Partial<Settings> = {
         defaultQuality: (document.getElementById('download-quality') as HTMLSelectElement).value,
         downloadChunkSize: parseInt((document.getElementById('download-chunks') as HTMLInputElement).value),
+        compressVideo: (document.getElementById('download-compress') as HTMLInputElement).checked,
         enableNotifications: (document.getElementById('download-notifications') as HTMLInputElement).checked,
         showThumbnails: (document.getElementById('download-thumbnails') as HTMLInputElement).checked,
         maxHistoryItems: parseInt((document.getElementById('history-max') as HTMLInputElement).value),
@@ -464,6 +466,7 @@ class SettingsManager {
       await storage.saveSettings({
         defaultQuality: 'Source',
         downloadChunkSize: 5,
+        compressVideo: true,
         enableNotifications: true,
         showThumbnails: true,
         maxHistoryItems: 100,
