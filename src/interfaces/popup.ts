@@ -377,6 +377,20 @@ async function init(): Promise<void> {
         progressSegments.textContent = `${progress.current}/${progress.total}`;
         progressSpeed.textContent = `${formatBytes(progress.speed)}/s`;
         progressSize.textContent = formatBytes(progress.downloadedBytes);
+        
+        // Calculate ETA
+        if (progress.speed > 0 && progress.current < progress.total) {
+          const remainingSegments = progress.total - progress.current;
+          const avgBytesPerSegment = progress.downloadedBytes / progress.current;
+          const remainingBytes = remainingSegments * avgBytesPerSegment;
+          const etaSeconds = Math.ceil(remainingBytes / progress.speed);
+          const etaText = formatTime(etaSeconds);
+          
+          // Update status with ETA
+          if (statusEl) {
+            statusEl.textContent = `⏳ Téléchargement en cours... (${etaText} restant)`;
+          }
+        }
       }
     }
     

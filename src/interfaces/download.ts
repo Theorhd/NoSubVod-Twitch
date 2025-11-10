@@ -15,6 +15,9 @@ const progressText = document.getElementById('progressText') as HTMLElement;
 const progressSpeed = document.getElementById('progressSpeed') as HTMLElement;
 const progressTime = document.getElementById('progressTime') as HTMLElement;
 
+// Flag to prevent duplicate completion messages
+let completionMessageSent = false;
+
 function updateStatus(message: string, type: 'info' | 'success' | 'error' = 'info') {
   statusEl.textContent = message;
   statusEl.classList.remove('hidden', 'success', 'error');
@@ -89,10 +92,15 @@ async function downloadWithAnchor(blobUrl: string, filename: string, downloadId:
     await dbHelper.deleteDownload(downloadId, segmentCount);
     console.log('[NoSubVod Download] IndexedDB cleaned up');
     
-    chrome.runtime.sendMessage({
-      type: 'FILE_WRITE_COMPLETE',
-      downloadId
-    });
+    // Notify background (only once)
+    if (!completionMessageSent) {
+      completionMessageSent = true;
+      chrome.runtime.sendMessage({
+        type: 'FILE_WRITE_COMPLETE',
+        downloadId
+      });
+      console.log('[NoSubVod Download] Completion message sent to background');
+    }
     
     // Auto-close after cleanup
     setTimeout(() => window.close(), 2000);
@@ -203,11 +211,15 @@ startBtn.addEventListener('click', async () => {
               await dbHelper.deleteDownload(downloadId, segmentCount);
               console.log('[NoSubVod Download] IndexedDB cleaned up');
               
-              // Notify background
-              chrome.runtime.sendMessage({
-                type: 'FILE_WRITE_COMPLETE',
-                downloadId
-              });
+              // Notify background (only once)
+              if (!completionMessageSent) {
+                completionMessageSent = true;
+                chrome.runtime.sendMessage({
+                  type: 'FILE_WRITE_COMPLETE',
+                  downloadId
+                });
+                console.log('[NoSubVod Download] Completion message sent to background');
+              }
               
               setTimeout(() => window.close(), 2000);
             } else if (dl.state === 'interrupted') {
@@ -255,6 +267,7 @@ startBtn.addEventListener('click', async () => {
         downloadId,
         error: error.message || 'Unknown error'
       });
+      console.log('[NoSubVod Download] Error message sent to background');
     }
   }
 });

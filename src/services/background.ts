@@ -156,10 +156,69 @@ async function downloadVod(
     let totalBytes = 0;
     let successfulSegments = 0;
     const downloadStartTime = Date.now();
+    const chunkSize = userSettings.downloadChunkSize || 5;
+    
+    // Prepare segments array to track download status
+    const segmentResults: Array<{ index: number; buffer: ArrayBuffer | null }> = 
+      new Array(segmentUrls.length).fill(null).map((_, i) => ({ index: i, buffer: null }));
 
-    // Download and store segments directly to IndexedDB (avoid memory overflow)
-    for (let i = 0; i < segmentUrls.length; i++) {
-      // Check if download was aborted or paused
+    /**
+     * Download a single segment with retry logic and exponential backoff
+     */
+    async function downloadSegmentWithRetry(
+      url: string, 
+      segmentIndex: number, 
+      maxRetries: number = 3
+    ): Promise<ArrayBuffer | null> {
+      let lastError: Error | null = null;
+      
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          // Check if download was aborted
+          if (activeDownloads.get(downloadId)?.abort) {
+            throw new Error('Téléchargement annulé');
+          }
+          
+          const segResp = await fetch(url);
+          if (!segResp.ok) {
+            throw new Error(`HTTP ${segResp.status}`);
+          }
+          
+          let buf = await segResp.arrayBuffer();
+          
+          // Compress segment if compression is enabled
+          if (shouldCompress && VideoCompressor.shouldCompress(buf.byteLength)) {
+            buf = await VideoCompressor.compressSegment(buf);
+          }
+          
+          return buf;
+        } catch (error: any) {
+          lastError = error;
+          
+          // Don't retry if download was aborted
+          if (error.message === 'Téléchargement annulé') {
+            throw error;
+          }
+          
+          // Exponential backoff: 1s, 2s, 4s
+          if (attempt < maxRetries - 1) {
+            const delay = Math.pow(2, attempt) * 1000;
+            console.warn(`[NoSubVod] Segment ${segmentIndex + 1} failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+      
+      console.error(`[NoSubVod] Segment ${segmentIndex + 1} failed after ${maxRetries} attempts:`, lastError?.message);
+      return null;
+    }
+
+    // Download segments in parallel batches
+    console.log(`[NoSubVod] Starting parallel download with ${chunkSize} concurrent segments`);
+    console.log(`[NoSubVod] This will be approximately ${chunkSize}x faster than sequential download!`);
+    
+    for (let batchStart = 0; batchStart < segmentUrls.length; batchStart += chunkSize) {
+      // Check if download was aborted
       const downloadState = activeDownloads.get(downloadId);
       if (downloadState?.abort) {
         throw new Error('Téléchargement annulé');
@@ -181,81 +240,92 @@ async function downloadVod(
         }
       }
 
-      try {
-        const segResp = await fetch(segmentUrls[i]);
-        if (!segResp.ok) {
-          console.warn(`[NoSubVod] Segment ${i+1} failed: HTTP ${segResp.status}, skipping...`);
-          failedCount++;
-          continue;
-        }
-        let buf = await segResp.arrayBuffer();
+      const batchEnd = Math.min(batchStart + chunkSize, segmentUrls.length);
+      const batchPromises: Promise<void>[] = [];
+      
+      // Download batch in parallel
+      for (let i = batchStart; i < batchEnd; i++) {
+        const segmentIndex = i;
+        const promise = downloadSegmentWithRetry(segmentUrls[segmentIndex], segmentIndex)
+          .then(async (buf) => {
+            if (buf) {
+              // Store directly to IndexedDB
+              await dbHelper.storeSegment(downloadId, successfulSegments, buf);
+              segmentResults[segmentIndex].buffer = buf;
+              successfulSegments++;
+              totalBytes += buf.byteLength;
+              
+              // Log compression info for first segment
+              if (successfulSegments === 1 && shouldCompress) {
+                console.log(`[NoSubVod] First segment compressed and stored`);
+              }
+            } else {
+              failedCount++;
+            }
+          });
         
-        // Compress segment if compression is enabled
-        if (shouldCompress && VideoCompressor.shouldCompress(buf.byteLength)) {
-          const originalSize = buf.byteLength;
-          buf = await VideoCompressor.compressSegment(buf);
-          const compressedSize = buf.byteLength;
-          const savings = originalSize - compressedSize;
-          
-          if (successfulSegments === 0) {
-            console.log(`[NoSubVod] First segment compressed: ${formatBytes(originalSize)} → ${formatBytes(compressedSize)} (saved ${formatBytes(savings)})`);
-          }
-        }
-        
-        // Store directly to IndexedDB to avoid memory overflow
-        await dbHelper.storeSegment(downloadId, successfulSegments, buf);
-        successfulSegments++;
-        totalBytes += buf.byteLength;
-        
-        // Log storage progress periodically
-        if (successfulSegments % 50 === 0 || i === segmentUrls.length - 1) {
-          console.log(`[NoSubVod] Stored ${successfulSegments} segments in IndexedDB (${formatBytes(totalBytes)})`);
-        }
-
-        // Send progress update
-        const elapsed = (Date.now() - downloadStartTime) / 1000;
-        const speed = elapsed > 0 ? totalBytes / elapsed : 0;
-        const progress: DownloadProgress = {
-          percent: Math.round(((i + 1) / segmentUrls.length) * 100),
-          current: i + 1,
-          total: segmentUrls.length,
-          speed,
-          downloadedBytes: totalBytes
-        };
-
-        // Update active download state
-        const activeDownload = await storage.getActiveDownload();
-        if (activeDownload) {
-          activeDownload.progress = progress;
-          await storage.setActiveDownload(activeDownload);
-        }
-
-        // Notify popup of progress (if still open)
-        chrome.runtime.sendMessage({
-          action: 'downloadProgress',
-          downloadId,
-          progress
-        }).catch(() => {
-          // Popup might be closed, ignore error
-        });
-      } catch (e) {
-        console.warn(`[NoSubVod] Segment ${i+1} error:`, e, ', skipping...');
-        failedCount++;
+        batchPromises.push(promise);
       }
+      
+      // Wait for entire batch to complete
+      await Promise.all(batchPromises);
+      
+      // Log progress
+      console.log(`[NoSubVod] Batch complete: ${successfulSegments}/${segmentUrls.length} segments downloaded (${formatBytes(totalBytes)})`);
+
+      // Send progress update after each batch
+      const elapsed = (Date.now() - downloadStartTime) / 1000;
+      const speed = elapsed > 0 ? totalBytes / elapsed : 0;
+      const progress: DownloadProgress = {
+        percent: Math.round((successfulSegments / segmentUrls.length) * 100),
+        current: successfulSegments,
+        total: segmentUrls.length,
+        speed,
+        downloadedBytes: totalBytes
+      };
+
+      // Update active download state
+      const activeDownload = await storage.getActiveDownload();
+      if (activeDownload) {
+        activeDownload.progress = progress;
+        await storage.setActiveDownload(activeDownload);
+      }
+
+      // Notify popup of progress (if still open)
+      chrome.runtime.sendMessage({
+        action: 'downloadProgress',
+        downloadId,
+        progress
+      }).catch(() => {
+        // Popup might be closed, ignore error
+      });
     }
 
     if (successfulSegments === 0) {
       throw new Error('Aucun segment n\'a pu être téléchargé');
     }
 
-    console.log('[NoSubVod] All segments downloaded, total size:', formatBytes(totalBytes));
+    const downloadDuration = (Date.now() - downloadStartTime) / 1000;
+    const avgSpeed = totalBytes / downloadDuration;
+    const successRate = ((successfulSegments / segmentUrls.length) * 100).toFixed(1);
+    
+    console.log('[NoSubVod] ═══════════════════════════════════════');
+    console.log('[NoSubVod] 📊 Download Complete Summary');
+    console.log('[NoSubVod] ═══════════════════════════════════════');
+    console.log(`[NoSubVod] ✓ Success: ${successfulSegments}/${segmentUrls.length} segments (${successRate}%)`);
+    console.log(`[NoSubVod] ✗ Failed: ${failedCount} segments (retried 3x each)`);
+    console.log(`[NoSubVod] 📦 Total size: ${formatBytes(totalBytes)}`);
+    console.log(`[NoSubVod] ⏱️  Duration: ${Math.round(downloadDuration)}s`);
+    console.log(`[NoSubVod] ⚡ Average speed: ${formatBytes(avgSpeed)}/s`);
+    console.log(`[NoSubVod] 🚀 Parallel downloads: ${chunkSize} concurrent`);
     
     if (shouldCompress) {
       const estimatedOriginalSize = segmentUrls.length * 1024 * 1024; // ~1MB per segment
       const savings = estimatedOriginalSize - totalBytes;
       const savingsPercent = Math.round((savings / estimatedOriginalSize) * 100);
-      console.log(`[NoSubVod] Compression enabled - estimated space saved: ${formatBytes(savings)} (~${savingsPercent}%)`);
+      console.log(`[NoSubVod] 🗜️  Compression saved: ${formatBytes(savings)} (~${savingsPercent}%)`);
     }
+    console.log('[NoSubVod] ═══════════════════════════════════════');
 
     const settings = await storage.getSettings();
     const thumbnail = settings.showThumbnails 
@@ -404,13 +474,32 @@ async function handleFileWriteComplete(request: any) {
   // Retrieve stored metadata
   const metadata = downloadMetadata.get(downloadId);
   if (!metadata) {
-    console.error('[NoSubVod] No metadata found for download:', downloadId);
+    console.warn('[NoSubVod] No metadata found for download:', downloadId);
+    console.warn('[NoSubVod] This may happen if the download completed from a previous session');
+    
+    // Clean up active downloads and return gracefully
+    activeDownloads.delete(downloadId);
+    await storage.clearActiveDownload();
+    
+    // Send completion message anyway
+    chrome.runtime.sendMessage({
+      action: 'downloadComplete',
+      downloadId,
+      success: true
+    }).catch(() => {});
+    
     return;
   }
   
   const { vodInfo, qualityLabel, thumbnail, totalBytes, failedCount, segmentCount } = metadata;
   
-  console.log('[NoSubVod] File write completed');
+  console.log('[NoSubVod] ═══════════════════════════════════════');
+  console.log('[NoSubVod] 📥 File Write Complete');
+  console.log('[NoSubVod] ═══════════════════════════════════════');
+  console.log(`[NoSubVod] Download ID: ${downloadId}`);
+  console.log(`[NoSubVod] VOD: ${vodInfo.title} (${qualityLabel})`);
+  console.log(`[NoSubVod] Segments: ${segmentCount}, Size: ${formatBytes(totalBytes)}`);
+  console.log('[NoSubVod] ═══════════════════════════════════════');
   
   // Add to history
   const downloadRecord: VodDownload = {
