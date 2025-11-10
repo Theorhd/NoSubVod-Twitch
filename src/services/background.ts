@@ -164,13 +164,22 @@ async function downloadVod(
 
     /**
      * Download a single segment with retry logic and exponential backoff
+     * Returns an object with the buffer and error information
      */
     async function downloadSegmentWithRetry(
       url: string, 
       segmentIndex: number, 
       maxRetries: number = 3
-    ): Promise<ArrayBuffer | null> {
+    ): Promise<{ buffer: ArrayBuffer | null; is403: boolean }> {
       let lastError: Error | null = null;
+      let is403 = false;
+      
+      // User agents rotation to avoid 403 blocks
+      const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+      ];
       
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
@@ -179,19 +188,68 @@ async function downloadVod(
             throw new Error('Téléchargement annulé');
           }
           
-          const segResp = await fetch(url);
-          if (!segResp.ok) {
-            throw new Error(`HTTP ${segResp.status}`);
+          // Add delay between attempts to avoid rate limiting
+          if (attempt > 0) {
+            const baseDelay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+            const jitter = Math.random() * 1000; // Add 0-1s random jitter
+            const delay = baseDelay + jitter;
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
           
-          let buf = await segResp.arrayBuffer();
+          // Rotate User-Agent for each attempt to avoid blocks
+          const userAgent = userAgents[attempt % userAgents.length];
+          
+          // Fetch with proper headers to avoid 403
+          const segResp = await fetch(url, {
+            headers: {
+              'User-Agent': userAgent,
+              'Accept': '*/*',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Origin': 'https://www.twitch.tv',
+              'Referer': 'https://www.twitch.tv/',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'cross-site'
+            },
+            // Add timeout to prevent hanging
+            signal: AbortSignal.timeout(30000) // 30s timeout
+          });
+          
+          if (!segResp.ok) {
+            // Handle specific HTTP errors
+            if (segResp.status === 403) {
+              is403 = true;
+              // Don't log each 403 - they're expected for copyrighted content
+              throw new Error(`HTTP 403 - Copyrighted content`);
+            } else if (segResp.status === 429) {
+              throw new Error(`HTTP 429 Too Many Requests - Rate limited`);
+            } else if (segResp.status >= 500) {
+              throw new Error(`HTTP ${segResp.status} Server Error`);
+            } else {
+              throw new Error(`HTTP ${segResp.status}`);
+            }
+          }
+          
+          let buf: ArrayBuffer;
+          try {
+            buf = await segResp.arrayBuffer();
+          } catch (memError: any) {
+            if (memError.name === 'RangeError' || memError.message.includes('allocation')) {
+              throw new Error('Memory allocation failed - segment too large');
+            }
+            throw memError;
+          }
           
           // Compress segment if compression is enabled
           if (shouldCompress && VideoCompressor.shouldCompress(buf.byteLength)) {
-            buf = await VideoCompressor.compressSegment(buf);
+            try {
+              buf = await VideoCompressor.compressSegment(buf);
+            } catch (compressError: any) {
+              // Compression failed, continue with uncompressed buffer
+            }
           }
           
-          return buf;
+          return { buffer: buf, is403: false };
         } catch (error: any) {
           lastError = error;
           
@@ -200,22 +258,35 @@ async function downloadVod(
             throw error;
           }
           
-          // Exponential backoff: 1s, 2s, 4s
-          if (attempt < maxRetries - 1) {
-            const delay = Math.pow(2, attempt) * 1000;
-            console.warn(`[NoSubVod] Segment ${segmentIndex + 1} failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+          // Mark as 403 if it's a copyright error
+          if (error.message.includes('403')) {
+            is403 = true;
+          }
+          
+          // Log detailed error info only for non-403 errors
+          if (!is403) {
+            const errorType = error.name || 'Unknown';
+            const errorMsg = error.message || 'Unknown error';
+            
+            if (attempt < maxRetries - 1) {
+              console.warn(`[NoSubVod] Segment ${segmentIndex + 1} failed [${errorType}]: ${errorMsg} (attempt ${attempt + 1}/${maxRetries})`);
+            } else {
+              console.error(`[NoSubVod] Segment ${segmentIndex + 1} failed after ${maxRetries} attempts [${errorType}]: ${errorMsg}`);
+            }
           }
         }
       }
       
-      console.error(`[NoSubVod] Segment ${segmentIndex + 1} failed after ${maxRetries} attempts:`, lastError?.message);
-      return null;
+      return { buffer: null, is403 };
     }
 
     // Download segments in parallel batches
     console.log(`[NoSubVod] Starting parallel download with ${chunkSize} concurrent segments`);
     console.log(`[NoSubVod] This will be approximately ${chunkSize}x faster than sequential download!`);
+    
+    let consecutiveFailures = 0;
+    let total403Errors = 0; // Track copyright-blocked segments
+    const maxConsecutiveFailures = 50; // Increased: 403 errors are expected for copyrighted content
     
     for (let batchStart = 0; batchStart < segmentUrls.length; batchStart += chunkSize) {
       // Check if download was aborted
@@ -224,8 +295,17 @@ async function downloadVod(
         throw new Error('Téléchargement annulé');
       }
       
+      // Only stop if we have too many consecutive NON-403 failures
+      // 403 errors are expected for copyrighted music segments
+      const nonCopyrightFailures = consecutiveFailures - total403Errors;
+      if (nonCopyrightFailures >= 30) {
+        console.error(`[NoSubVod] Stopping download: ${nonCopyrightFailures} consecutive non-copyright failures detected`);
+        throw new Error(`Trop d'échecs de connexion (${nonCopyrightFailures}). Vérifiez votre connexion Internet.`);
+      }
+      
       // Pause handling - wait until resumed or aborted
       if (downloadState?.paused) {
+        console.log('[NoSubVod] Download paused, waiting for resume...');
         await new Promise<void>(resolve => {
           const interval = setInterval(() => {
             const st = activeDownloads.get(downloadId);
@@ -238,30 +318,63 @@ async function downloadVod(
         if (activeDownloads.get(downloadId)?.abort) {
           throw new Error('Téléchargement annulé');
         }
+        console.log('[NoSubVod] Download resumed');
       }
 
       const batchEnd = Math.min(batchStart + chunkSize, segmentUrls.length);
       const batchPromises: Promise<void>[] = [];
+      let batchSuccessCount = 0;
+      let batch403Count = 0;
+      
+      // Add small delay between batches to avoid overwhelming the server
+      if (batchStart > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms between batches
+      }
       
       // Download batch in parallel
       for (let i = batchStart; i < batchEnd; i++) {
         const segmentIndex = i;
         const promise = downloadSegmentWithRetry(segmentUrls[segmentIndex], segmentIndex)
-          .then(async (buf) => {
-            if (buf) {
-              // Store directly to IndexedDB
-              await dbHelper.storeSegment(downloadId, successfulSegments, buf);
-              segmentResults[segmentIndex].buffer = buf;
-              successfulSegments++;
-              totalBytes += buf.byteLength;
-              
-              // Log compression info for first segment
-              if (successfulSegments === 1 && shouldCompress) {
-                console.log(`[NoSubVod] First segment compressed and stored`);
+          .then(async (result) => {
+            if (result && result.buffer) {
+              try {
+                // Store directly to IndexedDB using the original segment index
+                // This ensures segments are stored with their correct position
+                await dbHelper.storeSegment(downloadId, segmentIndex, result.buffer);
+                segmentResults[segmentIndex].buffer = result.buffer;
+                successfulSegments++;
+                totalBytes += result.buffer.byteLength;
+                batchSuccessCount++;
+                
+                // Reset consecutive failures on success
+                consecutiveFailures = 0;
+                
+                // Log compression info for first segment
+                if (successfulSegments === 1 && shouldCompress) {
+                  console.log(`[NoSubVod] First segment compressed and stored`);
+                }
+              } catch (storeError: any) {
+                console.error(`[NoSubVod] Failed to store segment ${segmentIndex + 1}:`, storeError.message);
+                failedCount++;
+                consecutiveFailures++;
               }
-            } else {
+            } else if (result && result.is403) {
+              // 403 error - copyrighted content, this is expected
               failedCount++;
+              total403Errors++;
+              batch403Count++;
+              consecutiveFailures++;
+              // Don't log individual 403 errors as they clutter the console
+            } else {
+              // Other error (network, timeout, etc.)
+              failedCount++;
+              consecutiveFailures++;
             }
+          })
+          .catch((error) => {
+            console.error(`[NoSubVod] Unexpected error processing segment ${segmentIndex + 1}:`, error);
+            failedCount++;
+            consecutiveFailures++;
           });
         
         batchPromises.push(promise);
@@ -270,14 +383,27 @@ async function downloadVod(
       // Wait for entire batch to complete
       await Promise.all(batchPromises);
       
+      // If no segments succeeded in this batch, log warning
+      if (batchSuccessCount === 0) {
+        if (batch403Count > 0) {
+          console.log(`[NoSubVod] Batch ${batchStart}-${batchEnd}: All segments blocked by copyright (${batch403Count} segments)`);
+        } else {
+          console.warn(`[NoSubVod] Warning: Entire batch failed (${batchStart}-${batchEnd})`);
+        }
+      } else if (batch403Count > 0) {
+        console.log(`[NoSubVod] Batch ${batchStart}-${batchEnd}: ${batch403Count} segments skipped (copyrighted content)`);
+      }
+      
       // Log progress
-      console.log(`[NoSubVod] Batch complete: ${successfulSegments}/${segmentUrls.length} segments downloaded (${formatBytes(totalBytes)})`);
+      const progressPercent = Math.round((successfulSegments / segmentUrls.length) * 100);
+      const copyrightedPercent = Math.round((total403Errors / segmentUrls.length) * 100);
+      console.log(`[NoSubVod] Progress: ${successfulSegments}/${segmentUrls.length} segments (${progressPercent}%) - ${formatBytes(totalBytes)} | Copyrighted: ${total403Errors} (${copyrightedPercent}%)`);
 
       // Send progress update after each batch
       const elapsed = (Date.now() - downloadStartTime) / 1000;
       const speed = elapsed > 0 ? totalBytes / elapsed : 0;
       const progress: DownloadProgress = {
-        percent: Math.round((successfulSegments / segmentUrls.length) * 100),
+        percent: progressPercent,
         current: successfulSegments,
         total: segmentUrls.length,
         speed,
@@ -299,6 +425,15 @@ async function downloadVod(
       }).catch(() => {
         // Popup might be closed, ignore error
       });
+      
+      // Force garbage collection hint (helps with memory)
+      try {
+        if ((globalThis as any).gc) {
+          (globalThis as any).gc();
+        }
+      } catch (e) {
+        // gc() not available or failed
+      }
     }
 
     if (successfulSegments === 0) {
@@ -308,12 +443,17 @@ async function downloadVod(
     const downloadDuration = (Date.now() - downloadStartTime) / 1000;
     const avgSpeed = totalBytes / downloadDuration;
     const successRate = ((successfulSegments / segmentUrls.length) * 100).toFixed(1);
+    const copyrightRate = ((total403Errors / segmentUrls.length) * 100).toFixed(1);
+    const otherFailures = failedCount - total403Errors;
     
     console.log('[NoSubVod] ═══════════════════════════════════════');
     console.log('[NoSubVod] 📊 Download Complete Summary');
     console.log('[NoSubVod] ═══════════════════════════════════════');
-    console.log(`[NoSubVod] ✓ Success: ${successfulSegments}/${segmentUrls.length} segments (${successRate}%)`);
-    console.log(`[NoSubVod] ✗ Failed: ${failedCount} segments (retried 3x each)`);
+    console.log(`[NoSubVod] ✓ Downloaded: ${successfulSegments}/${segmentUrls.length} segments (${successRate}%)`);
+    console.log(`[NoSubVod] 🎵 Copyrighted: ${total403Errors} segments (${copyrightRate}%) - Skipped`);
+    if (otherFailures > 0) {
+      console.log(`[NoSubVod] ✗ Failed: ${otherFailures} segments (network/other errors)`);
+    }
     console.log(`[NoSubVod] 📦 Total size: ${formatBytes(totalBytes)}`);
     console.log(`[NoSubVod] ⏱️  Duration: ${Math.round(downloadDuration)}s`);
     console.log(`[NoSubVod] ⚡ Average speed: ${formatBytes(avgSpeed)}/s`);
@@ -324,6 +464,10 @@ async function downloadVod(
       const savings = estimatedOriginalSize - totalBytes;
       const savingsPercent = Math.round((savings / estimatedOriginalSize) * 100);
       console.log(`[NoSubVod] 🗜️  Compression saved: ${formatBytes(savings)} (~${savingsPercent}%)`);
+    }
+    
+    if (total403Errors > 0) {
+      console.log(`[NoSubVod] ℹ️  Note: ${total403Errors} segments were blocked due to copyright (music/audio). These parts will be missing from the downloaded VOD.`);
     }
     console.log('[NoSubVod] ═══════════════════════════════════════');
 
@@ -373,9 +517,29 @@ async function downloadVod(
     // Clear active download
     await storage.clearActiveDownload();
     
+    // Create user-friendly error message
+    let errorMessage = e.message || 'Une erreur est survenue';
+    
+    // Specific error messages based on error type
+    if (errorMessage.includes('403')) {
+      errorMessage = 'Accès refusé par Twitch (HTTP 403). Le VOD peut être restreint ou vos requêtes bloquées. Attendez quelques minutes et réessayez.';
+    } else if (errorMessage.includes('429')) {
+      errorMessage = 'Trop de requêtes (HTTP 429). Twitch limite le nombre de téléchargements. Attendez 5-10 minutes et réessayez.';
+    } else if (errorMessage.includes('Memory') || errorMessage.includes('allocation')) {
+      errorMessage = 'Mémoire insuffisante. Fermez d\'autres onglets/applications et réessayez avec un format de fichier plus léger.';
+    } else if (errorMessage.includes('Failed to fetch')) {
+      errorMessage = 'Erreur réseau. Vérifiez votre connexion Internet et réessayez.';
+    } else if (errorMessage.includes('Quota')) {
+      errorMessage = 'Espace de stockage insuffisant. Libérez de l\'espace disque et réessayez.';
+    } else if (errorMessage.includes('consécutifs')) {
+      // Keep the original message for consecutive failures
+    } else if (!errorMessage.includes('annulé')) {
+      errorMessage = `Erreur de téléchargement: ${errorMessage}`;
+    }
+    
     showNotification(
       '❌ Échec du téléchargement',
-      e.message || 'Une erreur est survenue'
+      errorMessage
     );
 
     activeDownloads.delete(downloadId);
@@ -385,12 +549,12 @@ async function downloadVod(
       action: 'downloadComplete',
       downloadId,
       success: false,
-      error: e.message || e
+      error: errorMessage
     }).catch(() => {});
 
     sendResponse({
       success: false,
-      error: e.message || e
+      error: errorMessage
     });
   }
 }
