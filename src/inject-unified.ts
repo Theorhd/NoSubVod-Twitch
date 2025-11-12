@@ -9,15 +9,9 @@
 
 declare const chrome: any;
 
-// ============================================
-// IMPORTANT: Injection NON-BLOQUANTE pour ne pas ralentir Twitch
-// ============================================
-
 // Fonction d'injection asynchrone avec timeout
 async function injectPageScript() {
   try {
-    // Charger les settings AVANT d'injecter le script de page
-    // pour qu'ils soient disponibles immédiatement
     await new Promise<void>((resolve) => {
       chrome.storage.local.get('chatCustomization', (result: any) => {
         if (chrome.runtime.lastError) {
@@ -58,7 +52,7 @@ async function injectPageScript() {
 
     console.log('[NSV] Page script injected');
 
-    // Envoyer aussi un event pour notifier que les settings sont prêts
+    // Envoyer un event pour notifier que les settings sont prêts
     if ((window as any).NSV_SETTINGS) {
       setTimeout(() => {
         window.dispatchEvent(
@@ -73,7 +67,7 @@ async function injectPageScript() {
   }
 }
 
-// Injecter immédiatement sans attendre
+// Injecter
 injectPageScript();
 
 // Gérer les changements d'URL (SPA)

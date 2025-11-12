@@ -2,7 +2,13 @@
  * AdBlockerFeature.ts
  * Feature qui bloque ou passe automatiquement les publicités Twitch
  * Détecte et masque les overlays publicitaires pour améliorer l'expérience utilisateur
+ * 
+ * Actuellement non fonctionnel :
+ * - Les publicités sur les lives sont intégrées dans le flux du stream. : Comment bloquer ou ne pas récupérer les segements .m3u8 contenant les pubs ?
+ * 
+ * Pour l'instant la feature détermine bien la présence ou non d'une pub mais n'arrive pas à les bloquer efficacement.
  */
+
 
 import { Feature, FeatureConfig, FeatureContext } from '../core/Feature';
 

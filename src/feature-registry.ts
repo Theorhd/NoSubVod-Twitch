@@ -63,12 +63,6 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     tags: ['chat', 'badge', 'effect', 'customization']
   },
 
-  // Pour ajouter une nouvelle feature, décommentez et adaptez :
-  // {
-  //   featureClass: MyNewFeature,
-  //   category: 'experimental',
-  //   tags: ['new', 'test']
-  // },
 ];
 
 /**
