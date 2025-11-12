@@ -10,29 +10,18 @@
 declare const chrome: any;
 
 // ============================================
-// IMPORTANT: Charger les settings AVANT d'injecter le page script
+// IMPORTANT: Injection NON-BLOQUANTE pour ne pas ralentir Twitch
 // ============================================
-chrome.storage.local.get('chatCustomization', (result: any) => {
+
+// Fonction d'injection asynchrone avec timeout
+async function injectPageScript() {
   try {
-    // Préparer les settings pour le page script
-    if (result.chatCustomization) {
-      const settings = { ...result.chatCustomization };
-      if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
-        settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
-      }
-      (window as any).NSV_SETTINGS = settings;
-      console.log('[NSV] Chat settings preloaded for page script');
-    }
-    
-    // Configuration pour le patch URL - DOIT être fait AVANT l'injection du page script
+    // Configuration pour le patch URL
     const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
-    
-    // Solution 1 : Passer le patch_url via un attribut data sur le script
-    // Cela évite la violation CSP (pas de script inline)
-    const target = document.head || document.documentElement;
-    
-    // Injecter le script de page unifié avec l'URL en attribut data
     const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
+    
+    // Injecter immédiatement le script de page
+    const target = document.head || document.documentElement;
     const pageScript = document.createElement('script');
     pageScript.src = pageScriptUrl;
     pageScript.setAttribute('data-patch-url', patchUrl);
@@ -45,11 +34,36 @@ chrome.storage.local.get('chatCustomization', (result: any) => {
       target.appendChild(pageScript);
     }
 
-    console.log('[NSV] Page script injected with patch URL:', patchUrl);
+    console.log('[NSV] Page script injected');
+
+    // Charger les settings en arrière-plan (sans bloquer)
+    chrome.storage.local.get('chatCustomization', (result: any) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[NSV] Could not load chat settings:', chrome.runtime.lastError);
+        return;
+      }
+      
+      if (result.chatCustomization) {
+        const settings = { ...result.chatCustomization };
+        if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+          settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
+        }
+        (window as any).NSV_SETTINGS = settings;
+        window.dispatchEvent(
+          new CustomEvent('NSV_SETTINGS_UPDATED', {
+            detail: settings,
+          })
+        );
+        console.log('[NSV] Chat settings loaded');
+      }
+    });
   } catch (error) {
     console.error('[NSV] Error injecting page script:', error);
   }
-});
+}
+
+// Injecter immédiatement sans attendre
+injectPageScript();
 
 // Gérer les changements d'URL (SPA)
 try {
@@ -132,31 +146,44 @@ try {
 
 // ============================================
 // Initialiser les features du CONTENT SCRIPT
-// Fait de manière asynchrone après que la page soit chargée
+// Fait de manière asynchrone et non-bloquante
 // ============================================
-setTimeout(async () => {
-  try {
-    const { FeatureManager, FeatureContext } = await import('./core');
-    const { ChromeStorageAdapter } = await import('./core/storage-adapter');
-    const { instantiateAllFeatures } = await import('./feature-registry');
+function initializeContentFeatures() {
+  // Utiliser requestIdleCallback si disponible, sinon setTimeout
+  const scheduleInit = (window as any).requestIdleCallback || 
+    ((cb: () => void) => setTimeout(cb, 500));
+  
+  scheduleInit(async () => {
+    try {
+      const { FeatureManager, FeatureContext } = await import('./core');
+      const { ChromeStorageAdapter } = await import('./core/storage-adapter');
+      const { instantiateAllFeatures } = await import('./feature-registry');
 
-    const contentManager = new FeatureManager({
-      context: FeatureContext.CONTENT_SCRIPT,
-      currentUrl: window.location.href,
-      storage: new ChromeStorageAdapter()
-    });
+      const contentManager = new FeatureManager({
+        context: FeatureContext.CONTENT_SCRIPT,
+        currentUrl: window.location.href,
+        storage: new ChromeStorageAdapter()
+      });
 
-    const allContentFeatures = instantiateAllFeatures();
-    contentManager.registerMany(allContentFeatures);
+      const allContentFeatures = instantiateAllFeatures();
+      contentManager.registerMany(allContentFeatures);
 
-    await contentManager.initializeAll();
-    console.log('[NSV] Content script features initialized');
+      await contentManager.initializeAll();
+      console.log('[NSV] Content script features initialized');
 
-    (window as any).__NSV_CONTENT_MANAGER__ = contentManager;
-  } catch (error: any) {
-    console.error('[NSV] Failed to initialize content script features:', error);
-  }
-}, 100); // Petit délai pour ne pas bloquer le chargement initial
+      (window as any).__NSV_CONTENT_MANAGER__ = contentManager;
+    } catch (error: any) {
+      console.error('[NSV] Failed to initialize content script features:', error);
+    }
+  });
+}
+
+// Attendre que le DOM soit prêt avant d'initialiser les features
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeContentFeatures);
+} else {
+  initializeContentFeatures();
+}
 
 console.log('[NSV] Unified injection system loaded');
 
