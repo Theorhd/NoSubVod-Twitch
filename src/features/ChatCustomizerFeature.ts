@@ -141,6 +141,8 @@ export class ChatCustomizerFeature extends Feature {
       if (this.settings.enableMyBadge && this.settings.myBadgeText) {
         this.injectHideBadgesCSS();
       }
+      // Force immediate reprocessing when settings change
+      this.modifiedElements = new WeakSet<Element>();
       this.reprocessAllMessages();
     });
 
@@ -151,6 +153,8 @@ export class ChatCustomizerFeature extends Feature {
         if (this.settings.enableMyBadge && this.settings.myBadgeText) {
           this.injectHideBadgesCSS();
         }
+        // Force immediate reprocessing when settings change
+        this.modifiedElements = new WeakSet<Element>();
         this.reprocessAllMessages();
       }
     });
@@ -158,25 +162,37 @@ export class ChatCustomizerFeature extends Feature {
     // Try to load settings immediately if already available
     this.initializeSettings();
     
-    // Also try after a delay in case settings arrive later
-    setTimeout(() => {
-      if ((window as any).NSV_SETTINGS) {
-        this.log('Settings loaded after delay');
+    // Poll for settings arrival with multiple attempts
+    let attempts = 0;
+    const maxAttempts = 10; // 10 attempts over 5 seconds
+    const settingsPoller = setInterval(() => {
+      attempts++;
+      if ((window as any).NSV_SETTINGS && Object.keys((window as any).NSV_SETTINGS).length > 0) {
+        this.log('Settings detected after polling');
         this.initializeSettings();
+        clearInterval(settingsPoller);
+      } else if (attempts >= maxAttempts) {
+        this.log('Settings polling timeout - using defaults');
+        clearInterval(settingsPoller);
       }
     }, 500);
   }
 
   private initializeSettings(): void {
     if ((window as any).NSV_SETTINGS) {
+      const hasSettings = Object.keys((window as any).NSV_SETTINGS).length > 0;
       this.settings = { ...this.settings, ...(window as any).NSV_SETTINGS };
       this.log('Settings loaded from window.NSV_SETTINGS:', this.settings);
       if (this.settings.enableMyBadge && this.settings.myBadgeText) {
         this.injectHideBadgesCSS();
       }
-      setTimeout(() => {
-        this.reprocessAllMessages();
-      }, 100);
+      if (hasSettings) {
+        // Clear modified elements to force reprocessing with new settings
+        this.modifiedElements = new WeakSet<Element>();
+        setTimeout(() => {
+          this.reprocessAllMessages();
+        }, 100);
+      }
     } else {
       this.log('No settings found in window.NSV_SETTINGS, using defaults');
     }

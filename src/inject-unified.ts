@@ -16,11 +16,33 @@ declare const chrome: any;
 // Fonction d'injection asynchrone avec timeout
 async function injectPageScript() {
   try {
+    // Charger les settings AVANT d'injecter le script de page
+    // pour qu'ils soient disponibles immédiatement
+    await new Promise<void>((resolve) => {
+      chrome.storage.local.get('chatCustomization', (result: any) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[NSV] Could not load chat settings:', chrome.runtime.lastError);
+          resolve();
+          return;
+        }
+        
+        if (result.chatCustomization) {
+          const settings = { ...result.chatCustomization };
+          if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+            settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
+          }
+          (window as any).NSV_SETTINGS = settings;
+          console.log('[NSV] Chat settings preloaded');
+        }
+        resolve();
+      });
+    });
+
     // Configuration pour le patch URL
     const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
     const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
     
-    // Injecter immédiatement le script de page
+    // Injecter le script de page
     const target = document.head || document.documentElement;
     const pageScript = document.createElement('script');
     pageScript.src = pageScriptUrl;
@@ -36,27 +58,16 @@ async function injectPageScript() {
 
     console.log('[NSV] Page script injected');
 
-    // Charger les settings en arrière-plan (sans bloquer)
-    chrome.storage.local.get('chatCustomization', (result: any) => {
-      if (chrome.runtime.lastError) {
-        console.warn('[NSV] Could not load chat settings:', chrome.runtime.lastError);
-        return;
-      }
-      
-      if (result.chatCustomization) {
-        const settings = { ...result.chatCustomization };
-        if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
-          settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
-        }
-        (window as any).NSV_SETTINGS = settings;
+    // Envoyer aussi un event pour notifier que les settings sont prêts
+    if ((window as any).NSV_SETTINGS) {
+      setTimeout(() => {
         window.dispatchEvent(
           new CustomEvent('NSV_SETTINGS_UPDATED', {
-            detail: settings,
+            detail: (window as any).NSV_SETTINGS,
           })
         );
-        console.log('[NSV] Chat settings loaded');
-      }
-    });
+      }, 100);
+    }
   } catch (error) {
     console.error('[NSV] Error injecting page script:', error);
   }
