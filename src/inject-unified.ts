@@ -9,16 +9,20 @@
 
 declare const chrome: any;
 
-// Injection IMMÉDIATE du script de page (ultra-prioritaire)
-function injectPageScriptSync() {
+// Fonction d'injection du script de page
+function injectPageScript() {
   const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
   const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
   
-  // Attendre que documentElement existe (minimal DOM)
-  const inject = () => {
-    if (!document.documentElement) {
-      // Utiliser un micro-task au lieu de setTimeout pour être plus rapide
-      Promise.resolve().then(inject);
+  const doInject = () => {
+    const target = document.head || document.documentElement;
+    if (!target) {
+      // Attendre que le DOM soit prêt
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', doInject, { once: true });
+      } else {
+        setTimeout(doInject, 10);
+      }
       return;
     }
     
@@ -26,13 +30,17 @@ function injectPageScriptSync() {
     pageScript.src = pageScriptUrl;
     pageScript.setAttribute('data-patch-url', patchUrl);
     
-    // Injecter dans documentElement directement (avant même head)
-    document.documentElement.insertBefore(pageScript, document.documentElement.firstChild);
+    // Insérer au début pour exécution prioritaire
+    if (target.firstChild) {
+      target.insertBefore(pageScript, target.firstChild);
+    } else {
+      target.appendChild(pageScript);
+    }
     
     console.log('[NSV] Page script injected');
   };
   
-  inject();
+  doInject();
 }
 
 // Fonction pour charger les settings de chat de manière asynchrone
@@ -69,8 +77,8 @@ async function loadChatSettings() {
   }
 }
 
-// Injecter IMMÉDIATEMENT de manière synchrone
-injectPageScriptSync();
+// Injecter le script de page
+injectPageScript();
 
 // Charger les settings de chat en arrière-plan (asynchrone)
 loadChatSettings();
@@ -188,9 +196,16 @@ function initializeContentFeatures() {
   });
 }
 
-// Initialiser les features immédiatement (on s'exécute à document_start)
-// mais de manière asynchrone pour ne pas bloquer le chargement de la page
-initializeContentFeatures();
+// Attendre que le DOM soit complètement prêt avant d'initialiser
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    // Petit délai supplémentaire pour laisser Twitch s'initialiser
+    setTimeout(initializeContentFeatures, 100);
+  });
+} else {
+  // DOM déjà prêt, initialiser après un court délai
+  setTimeout(initializeContentFeatures, 100);
+}
 
 console.log('[NSV] Unified injection system loaded');
 
