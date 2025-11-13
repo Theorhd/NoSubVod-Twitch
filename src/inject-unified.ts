@@ -9,8 +9,35 @@
 
 declare const chrome: any;
 
-// Fonction d'injection asynchrone avec timeout
-async function injectPageScript() {
+// Fonction d'injection SYNCHRONE ET IMMÉDIATE pour être prêt avant le Worker
+function injectPageScriptImmediately() {
+  try {
+    // Configuration pour le patch URL
+    const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
+    const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
+    
+    // Injecter le script de page IMMÉDIATEMENT
+    const target = document.head || document.documentElement;
+    const pageScript = document.createElement('script');
+    pageScript.src = pageScriptUrl;
+    pageScript.setAttribute('data-patch-url', patchUrl);
+    pageScript.onload = () => pageScript.remove();
+    
+    // Insérer au début du document
+    if (target.firstChild) {
+      target.insertBefore(pageScript, target.firstChild);
+    } else {
+      target.appendChild(pageScript);
+    }
+
+    console.log('[NSV] Page script injected');
+  } catch (error) {
+    console.error('[NSV] Error injecting page script:', error);
+  }
+}
+
+// Fonction pour charger les settings de chat de manière asynchrone
+async function loadChatSettings() {
   try {
     await new Promise<void>((resolve) => {
       chrome.storage.local.get('chatCustomization', (result: any) => {
@@ -27,48 +54,27 @@ async function injectPageScript() {
           }
           (window as any).NSV_SETTINGS = settings;
           console.log('[NSV] Chat settings preloaded');
+          
+          // Envoyer un event pour notifier que les settings sont prêts
+          window.dispatchEvent(
+            new CustomEvent('NSV_SETTINGS_UPDATED', {
+              detail: settings,
+            })
+          );
         }
         resolve();
       });
     });
-
-    // Configuration pour le patch URL
-    const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
-    const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
-    
-    // Injecter le script de page
-    const target = document.head || document.documentElement;
-    const pageScript = document.createElement('script');
-    pageScript.src = pageScriptUrl;
-    pageScript.setAttribute('data-patch-url', patchUrl);
-    pageScript.onload = () => pageScript.remove();
-    
-    // Insérer au début du document
-    if (target.firstChild) {
-      target.insertBefore(pageScript, target.firstChild);
-    } else {
-      target.appendChild(pageScript);
-    }
-
-    console.log('[NSV] Page script injected');
-
-    // Envoyer un event pour notifier que les settings sont prêts
-    if ((window as any).NSV_SETTINGS) {
-      setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('NSV_SETTINGS_UPDATED', {
-            detail: (window as any).NSV_SETTINGS,
-          })
-        );
-      }, 100);
-    }
   } catch (error) {
-    console.error('[NSV] Error injecting page script:', error);
+    console.warn('[NSV] Error loading chat settings:', error);
   }
 }
 
-// Injecter
-injectPageScript();
+// Injecter IMMÉDIATEMENT (synchrone)
+injectPageScriptImmediately();
+
+// Charger les settings de chat en arrière-plan (asynchrone)
+loadChatSettings();
 
 // Gérer les changements d'URL (SPA)
 try {
@@ -183,12 +189,9 @@ function initializeContentFeatures() {
   });
 }
 
-// Attendre que le DOM soit prêt avant d'initialiser les features
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeContentFeatures);
-} else {
-  initializeContentFeatures();
-}
+// Initialiser les features immédiatement (on s'exécute à document_start)
+// mais de manière asynchrone pour ne pas bloquer le chargement de la page
+initializeContentFeatures();
 
 console.log('[NSV] Unified injection system loaded');
 
