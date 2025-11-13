@@ -29,26 +29,28 @@ export class VodUnlockerFeature extends Feature {
   protected async onInitialize(): Promise<void> {
     this.log('Initializing VOD unlocker');
     
-    // Attendre que window.patch_url soit disponible (max 5 secondes)
-    let attempts = 0;
-    const maxAttempts = 50; // 50 * 100ms = 5 secondes
-    
-    while (!((window as any).patch_url) && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      attempts++;
-    }
-    
     // Récupérer l'URL du patch depuis window (définie par inject-unified.ts)
+    // Le patch_url devrait être disponible immédiatement car défini de manière synchrone
+    // dans page-script-entry.ts avant l'initialisation des features
     if ((window as any).patch_url) {
       this.patchUrl = (window as any).patch_url;
       this.log('Patch URL loaded:', this.patchUrl);
     } else {
-      this.logError('Patch URL not available in window.patch_url after waiting');
+      // Si le patch_url n'est pas disponible immédiatement, réessayer de manière non-bloquante
+      this.logError('Patch URL not available immediately, will retry on enable');
+      // On ne bloque pas l'initialisation, on réessayera lors de l'activation
     }
   }
 
   protected async onEnable(): Promise<void> {
     this.log('Enabling VOD unlocker');
+    
+    // Si le patch_url n'était pas disponible lors de l'initialisation, réessayer maintenant
+    if (!this.patchUrl && (window as any).patch_url) {
+      this.patchUrl = (window as any).patch_url;
+      this.log('Patch URL loaded on enable:', this.patchUrl);
+    }
+    
     this.patchWorker();
   }
 
