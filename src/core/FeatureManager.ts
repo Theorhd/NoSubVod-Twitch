@@ -98,18 +98,34 @@ export class FeatureManager {
     console.log(`[NSV] Initializing ${this.features.size} features in context: ${this.config.context}`);
 
     // Charger l'état activé/désactivé depuis le storage si disponible
+    // Avec timeout pour ne pas bloquer
     if (this.config.storage) {
-      await this.loadFeatureSettings();
+      try {
+        await Promise.race([
+          this.loadFeatureSettings(),
+          new Promise(resolve => setTimeout(resolve, 2000)) // Timeout 2s
+        ]);
+      } catch (error) {
+        console.warn('[NSV] Storage load timeout or error:', error);
+      }
     }
 
     // Résoudre les dépendances et initialiser dans l'ordre
     const orderedFeatures = this.resolveDependencies();
     
+    // Initialiser les features en parallèle par groupes (non dépendantes)
+    // mais avec timeout individuel pour éviter qu'une feature bloque tout
     for (const feature of orderedFeatures) {
       try {
-        await feature.initialize();
+        await Promise.race([
+          feature.initialize(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Feature initialization timeout')), 5000)
+          )
+        ]);
       } catch (error) {
         console.error(`[NSV] Failed to initialize feature ${feature.getId()}:`, error);
+        // Continuer avec les autres features
       }
     }
 

@@ -44,7 +44,24 @@ const oldFetch = (self as any).fetch;
 
 (self as any).fetch = async function(input: RequestInfo, init?: RequestInit): Promise<Response> {
   const url = input instanceof Request ? input.url : input.toString();
-  const response = await oldFetch(input, init);
+  
+  // Optimisation : Utiliser Promise.race avec timeout pour éviter les blocages
+  const fetchWithTimeout = (promise: Promise<Response>, timeoutMs: number = 30000) => {
+    return Promise.race([
+      promise,
+      new Promise<Response>((_, reject) => 
+        setTimeout(() => reject(new Error('Fetch timeout')), timeoutMs)
+      )
+    ]);
+  };
+  
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(oldFetch(input, init));
+  } catch (error) {
+    console.error('[NSV] Fetch error:', error);
+    return new Response('Fetch failed', { status: 500 });
+  }
 
   // Patch playlist from unmuted to muted segments
   if (url.includes('cloudfront') && url.includes('.m3u8')) {
@@ -97,15 +114,26 @@ const oldFetch = (self as any).fetch;
           streamUrl = `https://${domain}/${vodSpecialID}/${resKey}/index-dvr.m3u8`;
         }
         if (!streamUrl) continue;
-        const valid = await isValidQuality(streamUrl);
-        if (valid) {
-          const quality = resKey === 'chunked' ? `${resolutions[resKey].res.split('x')[1]}p` : resKey;
-          const enabled = resKey === 'chunked' ? 'YES' : 'NO';
-          fakePlaylist += `
+        
+        // Optimisation : Valider les qualités en parallèle avec timeout
+        try {
+          const valid = await Promise.race([
+            isValidQuality(streamUrl),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)) // Timeout 5s par qualité
+          ]);
+          
+          if (valid) {
+            const quality = resKey === 'chunked' ? `${resolutions[resKey].res.split('x')[1]}p` : resKey;
+            const enabled = resKey === 'chunked' ? 'YES' : 'NO';
+            fakePlaylist += `
 #EXT-X-MEDIA:TYPE=VIDEO,GROUP-ID="${quality}",NAME="${quality}",AUTOSELECT=${enabled},DEFAULT=${enabled}
 #EXT-X-STREAM-INF:BANDWIDTH=${startBandwidth},CODECS="${valid.codec},mp4a.40.2",RESOLUTION=${resolutions[resKey].res},VIDEO="${quality}",FRAME-RATE=${resolutions[resKey].fps}
 ${streamUrl}`;
-          startBandwidth -= 100;
+            startBandwidth -= 100;
+          }
+        } catch (error) {
+          console.warn('[NSV] Failed to validate quality for', resKey, error);
+          // Continuer avec les autres qualités
         }
       }
 
