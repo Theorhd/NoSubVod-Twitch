@@ -9,31 +9,30 @@
 
 declare const chrome: any;
 
-// Fonction d'injection SYNCHRONE ET IMMÉDIATE pour être prêt avant le Worker
-function injectPageScriptImmediately() {
-  try {
-    // Configuration pour le patch URL
-    const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
-    const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
+// Injection IMMÉDIATE du script de page (ultra-prioritaire)
+function injectPageScriptSync() {
+  const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
+  const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
+  
+  // Attendre que documentElement existe (minimal DOM)
+  const inject = () => {
+    if (!document.documentElement) {
+      // Utiliser un micro-task au lieu de setTimeout pour être plus rapide
+      Promise.resolve().then(inject);
+      return;
+    }
     
-    // Injecter le script de page IMMÉDIATEMENT
-    const target = document.head || document.documentElement;
     const pageScript = document.createElement('script');
     pageScript.src = pageScriptUrl;
     pageScript.setAttribute('data-patch-url', patchUrl);
-    pageScript.onload = () => pageScript.remove();
     
-    // Insérer au début du document
-    if (target.firstChild) {
-      target.insertBefore(pageScript, target.firstChild);
-    } else {
-      target.appendChild(pageScript);
-    }
-
+    // Injecter dans documentElement directement (avant même head)
+    document.documentElement.insertBefore(pageScript, document.documentElement.firstChild);
+    
     console.log('[NSV] Page script injected');
-  } catch (error) {
-    console.error('[NSV] Error injecting page script:', error);
-  }
+  };
+  
+  inject();
 }
 
 // Fonction pour charger les settings de chat de manière asynchrone
@@ -70,8 +69,8 @@ async function loadChatSettings() {
   }
 }
 
-// Injecter IMMÉDIATEMENT (synchrone)
-injectPageScriptImmediately();
+// Injecter IMMÉDIATEMENT de manière synchrone
+injectPageScriptSync();
 
 // Charger les settings de chat en arrière-plan (asynchrone)
 loadChatSettings();

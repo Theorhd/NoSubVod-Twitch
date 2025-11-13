@@ -1,6 +1,6 @@
 {
   "name": "nosubvod-twitch",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Show sub-only VOD on Twitch",
   "manifest_version": 3,
   "action": {
@@ -35,7 +35,7 @@
       "js": [
         "dist/inject-unified.js"
       ],
-      "all_frames": true,
+      "all_frames": false,
       "run_at": "document_start"
     }
   ],
