@@ -14,33 +14,25 @@ function injectPageScript() {
   const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
   const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
   
-  const doInject = () => {
-    const target = document.head || document.documentElement;
-    if (!target) {
-      // Attendre que le DOM soit prêt
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', doInject, { once: true });
-      } else {
-        setTimeout(doInject, 10);
-      }
-      return;
-    }
-    
-    const pageScript = document.createElement('script');
-    pageScript.src = pageScriptUrl;
-    pageScript.setAttribute('data-patch-url', patchUrl);
-    
-    // Insérer au début pour exécution prioritaire
-    if (target.firstChild) {
-      target.insertBefore(pageScript, target.firstChild);
-    } else {
-      target.appendChild(pageScript);
-    }
-    
-    console.log('[NSV] Page script injected');
-  };
+  // Ajouter un paramètre de version pour éviter les problèmes de cache
+  const version = chrome.runtime.getManifest().version;
+  const pageScriptUrlWithVersion = `${pageScriptUrl}?v=${version}`;
   
-  doInject();
+  // Avec document_idle, on est sûr que documentElement existe
+  const target = document.head || document.documentElement;
+  
+  const pageScript = document.createElement('script');
+  pageScript.src = pageScriptUrlWithVersion;
+  pageScript.setAttribute('data-patch-url', patchUrl);
+  
+  // Insérer au début pour exécution prioritaire
+  if (target.firstChild) {
+    target.insertBefore(pageScript, target.firstChild);
+  } else {
+    target.appendChild(pageScript);
+  }
+  
+  console.log('[NSV] Page script injected');
 }
 
 // Fonction pour charger les settings de chat de manière asynchrone
