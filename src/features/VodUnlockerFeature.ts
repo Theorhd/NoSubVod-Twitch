@@ -72,30 +72,37 @@ export class VodUnlockerFeature extends Feature {
 
     // Override Worker avec le patch
     try {
-      (window as any).Worker = class Worker extends this.originalWorker {
+      const self = this;
+      const patchUrl = this.patchUrl;
+      
+      (window as any).Worker = class PatchedWorker extends self.originalWorker {
         constructor(twitchBlobUrl: string) {
-          let workerUrl = twitchBlobUrl;
-          try {
-            const escapedUrl = twitchBlobUrl.replace(/'/g, "%27");
-            const req = new XMLHttpRequest();
-            req.open('GET', escapedUrl, false);
-            req.overrideMimeType("text/javascript");
-            req.send();
-            const wasmJs = req.responseText;
+          // Solution: créer un Worker intermédiaire qui charge le patch puis le code Twitch
+          // On utilise importScripts qui est synchrone dans les Workers
+          const loaderCode = `
+            // D'abord charger le patch
+            try {
+              importScripts('${patchUrl}');
+              console.log('[NSV] Patch loaded in worker');
+            } catch (err) {
+              console.error('[NSV] Failed to load patch:', err);
+            }
             
-            // Injecter le patch
-            const blobContent = `importScripts('${(window as any).NSV_PATCH_URL}');\n${wasmJs}`;
-            const blob = new Blob([blobContent], { type: 'application/javascript' });
-            workerUrl = URL.createObjectURL(blob);
-          } catch (err) {
-            console.error('[NSV] Worker patch failed, using original URL', err);
-          }
-          super(workerUrl);
+            // Ensuite charger le code Twitch original
+            try {
+              importScripts('${twitchBlobUrl.replace(/'/g, "\\'")}');
+              console.log('[NSV] Twitch worker code loaded');
+            } catch (err) {
+              console.error('[NSV] Failed to load Twitch worker:', err);
+            }
+          `;
+          
+          const blob = new Blob([loaderCode], { type: 'application/javascript' });
+          const patchedUrl = URL.createObjectURL(blob);
+          
+          super(patchedUrl);
         }
       };
-
-      // Exposer l'URL du patch dans window pour le Worker
-      (window as any).NSV_PATCH_URL = this.patchUrl;
       
       this.log('Worker patched successfully');
     } catch (e) {
@@ -106,7 +113,6 @@ export class VodUnlockerFeature extends Feature {
   private restoreWorker(): void {
     if (this.originalWorker) {
       (window as any).Worker = this.originalWorker;
-      delete (window as any).NSV_PATCH_URL;
       this.log('Worker restored to original');
     }
   }
