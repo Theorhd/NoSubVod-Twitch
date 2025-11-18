@@ -71,12 +71,29 @@ const oldFetch = (self as any).fetch;
 
   if (url.startsWith('https://usher.ttvnw.net/vod/')) {
     if (response.status !== 200) {
-      const vodId = url.split('https://usher.ttvnw.net/vod/')[1].split('.m3u8')[0];
+      // Extract vodId, removing any version prefix (v2/, v3/, etc.)
+      let vodId = url.split('https://usher.ttvnw.net/vod/')[1].split('.m3u8')[0];
+      vodId = vodId.replace(/^v\d+\//, ''); // Remove v2/, v3/, etc.
+      
+      console.log('[NSV] Fetching VOD data for:', vodId);
       const data = await fetchTwitchDataGQL(vodId);
+      console.log('[NSV] GQL response:', JSON.stringify(data));
+      
       if (!data || !data.data) {
+        console.error('[NSV] Invalid GQL response structure:', data);
         return new Response('Unable to fetch twitch data API', { status: 403 });
       }
+      
       const vodData = data.data.video;
+      if (!vodData) {
+        console.error('[NSV] No video data in response:', data.data);
+        return new Response('Video not found', { status: 404 });
+      }
+      
+      if (!vodData.owner || !vodData.seekPreviewsURL) {
+        console.error('[NSV] Missing vodData.owner or seekPreviewsURL:', vodData);
+        return new Response('Invalid VOD data', { status: 403 });
+      }
       const channelData = vodData.owner;
 
       const resolutions: Record<string, { res: string; fps: number }> = {
@@ -90,10 +107,27 @@ const oldFetch = (self as any).fetch;
       const keys = Object.keys(resolutions).reverse();
       
       // Extract domain and vodSpecialID from seekPreviewsURL
-      const currentURL = new URL(vodData.seekPreviewsURL);
-      const domain = currentURL.host;
-      const paths = currentURL.pathname.split('/');
-      const vodSpecialID = paths[paths.findIndex((el: string) => el.includes('storyboards')) - 1];
+      let domain: string;
+      let vodSpecialID: string;
+      
+      try {
+        const currentURL = new URL(vodData.seekPreviewsURL);
+        domain = currentURL.host;
+        const paths = currentURL.pathname.split('/');
+        const storyboardIndex = paths.findIndex((el: string) => el.includes('storyboards'));
+        if (storyboardIndex === -1) {
+          console.error('[NSV] Cannot find storyboards in URL:', vodData.seekPreviewsURL);
+          return new Response('Invalid seekPreviewsURL format', { status: 403 });
+        }
+        vodSpecialID = paths[storyboardIndex - 1];
+        if (!vodSpecialID) {
+          console.error('[NSV] Cannot extract vodSpecialID from:', vodData.seekPreviewsURL);
+          return new Response('Invalid vodSpecialID', { status: 403 });
+        }
+      } catch (error) {
+        console.error('[NSV] Failed to parse seekPreviewsURL:', vodData.seekPreviewsURL, error);
+        return new Response('Failed to parse seekPreviewsURL', { status: 403 });
+      }
       
       let fakePlaylist = `#EXTM3U
 #EXT-X-TWITCH-INFO:ORIGIN="s3",B="false",REGION="EU",USER-IP="127.0.0.1",SERVING-ID="${createServingID()}",CLUSTER="cloudfront_vod",USER-COUNTRY="BE",MANIFEST-CLUSTER="cloudfront_vod"`;
