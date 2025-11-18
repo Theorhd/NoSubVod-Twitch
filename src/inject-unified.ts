@@ -9,8 +9,8 @@
 
 declare const chrome: any;
 
-// Injection IMMÉDIATE du script de page (ultra-prioritaire)
-function injectPageScriptSync() {
+// Fonction d'injection du script de page
+function injectPageScript() {
   const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
   const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
   
@@ -87,8 +87,8 @@ async function loadChatSettings() {
   }
 }
 
-// Injecter IMMÉDIATEMENT de manière synchrone
-injectPageScriptSync();
+// Injecter le script de page
+injectPageScript();
 
 // Charger les settings de chat en arrière-plan (asynchrone)
 loadChatSettings();
@@ -215,9 +215,16 @@ function initializeContentFeatures() {
   });
 }
 
-// Initialiser les features immédiatement (on s'exécute à document_start)
-// mais de manière asynchrone pour ne pas bloquer le chargement de la page
-initializeContentFeatures();
+// Attendre que le DOM soit complètement prêt avant d'initialiser
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    // Petit délai supplémentaire pour laisser Twitch s'initialiser
+    setTimeout(initializeContentFeatures, 100);
+  });
+} else {
+  // DOM déjà prêt, initialiser après un court délai
+  setTimeout(initializeContentFeatures, 100);
+}
 
 console.log('[NSV] Unified injection system loaded');
 
