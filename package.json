@@ -1,6 +1,6 @@
 {
   "name": "nosubvod-twitch",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Show sub-only VOD on Twitch - Modular Architecture",
   "scripts": {
     "build": "node build.js",

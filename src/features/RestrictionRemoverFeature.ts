@@ -7,6 +7,7 @@ import { Feature, FeatureConfig, FeatureContext } from '../core/Feature';
 
 export class RestrictionRemoverFeature extends Feature {
   private observer: MutationObserver | null = null;
+  private debounceTimer: number | null = null;
   private readonly restrictionSelectors = [
     '.video-preview-card-restriction',
     '[data-a-target*="restriction"]',
@@ -101,13 +102,21 @@ export class RestrictionRemoverFeature extends Feature {
     }
 
     this.observer = new MutationObserver(mutations => {
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            this.processNode(node as Element);
-          }
+      // Debouncing : traiter les mutations groupées
+      if (this.debounceTimer !== null) {
+        clearTimeout(this.debounceTimer);
+      }
+      
+      this.debounceTimer = window.setTimeout(() => {
+        mutations.forEach(mutation => {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              this.processNode(node as Element);
+            }
+          });
         });
-      });
+        this.debounceTimer = null;
+      }, 150); // Attendre 150ms avant de traiter
     });
 
     this.observer.observe(document.body, {
@@ -119,6 +128,11 @@ export class RestrictionRemoverFeature extends Feature {
   }
 
   private stopObserver(): void {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    
     if (this.observer) {
       this.observer.disconnect();
       this.observer = null;
@@ -127,8 +141,15 @@ export class RestrictionRemoverFeature extends Feature {
   }
 
   private processNode(node: Element): void {
+    // Vérifier d'abord le nœud lui-même
     if (this.isRestrictionElement(node)) {
       node.remove();
+      return;
+    }
+
+    // Limiter la recherche en profondeur pour éviter les lags
+    // Ne chercher que dans les conteneurs de vidéos
+    if (!node.matches('.tw-card, [data-a-target*="video"], [data-a-target*="card"]')) {
       return;
     }
 

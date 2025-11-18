@@ -14,56 +14,74 @@ function injectPageScript() {
   const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
   const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
   
-  // Ajouter un paramètre de version pour éviter les problèmes de cache
-  const version = chrome.runtime.getManifest().version;
-  const pageScriptUrlWithVersion = `${pageScriptUrl}?v=${version}`;
+  // Attendre que documentElement existe (minimal DOM) avec timeout de sécurité
+  let attempts = 0;
+  const maxAttempts = 50; // 50ms max
   
-  // Avec document_idle, on est sûr que documentElement existe
-  const target = document.head || document.documentElement;
+  const inject = () => {
+    attempts++;
+    
+    if (!document.documentElement) {
+      if (attempts < maxAttempts) {
+        // Utiliser un micro-task au lieu de setTimeout pour être plus rapide
+        Promise.resolve().then(inject);
+      } else {
+        console.warn('[NSV] Failed to inject page script: documentElement not ready after', maxAttempts, 'attempts');
+      }
+      return;
+    }
+    
+    try {
+      const pageScript = document.createElement('script');
+      pageScript.src = pageScriptUrl;
+      pageScript.setAttribute('data-patch-url', patchUrl);
+      pageScript.async = true; // Rendre le chargement asynchrone
+      
+      // Injecter dans documentElement directement (avant même head)
+      document.documentElement.insertBefore(pageScript, document.documentElement.firstChild);
+      
+      console.log('[NSV] Page script injected (attempt', attempts, ')');
+    } catch (error) {
+      console.error('[NSV] Error injecting page script:', error);
+    }
+  };
   
-  const pageScript = document.createElement('script');
-  pageScript.src = pageScriptUrlWithVersion;
-  pageScript.setAttribute('data-patch-url', patchUrl);
-  
-  // Insérer au début pour exécution prioritaire
-  if (target.firstChild) {
-    target.insertBefore(pageScript, target.firstChild);
-  } else {
-    target.appendChild(pageScript);
-  }
-  
-  console.log('[NSV] Page script injected');
+  inject();
 }
 
 // Fonction pour charger les settings de chat de manière asynchrone
 async function loadChatSettings() {
   try {
-    await new Promise<void>((resolve) => {
-      chrome.storage.local.get('chatCustomization', (result: any) => {
-        if (chrome.runtime.lastError) {
-          console.warn('[NSV] Could not load chat settings:', chrome.runtime.lastError);
-          resolve();
-          return;
-        }
-        
-        if (result.chatCustomization) {
-          const settings = { ...result.chatCustomization };
-          if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
-            settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
+    // Ajouter un timeout de sécurité pour ne pas bloquer indéfiniment
+    await Promise.race([
+      new Promise<void>((resolve) => {
+        chrome.storage.local.get('chatCustomization', (result: any) => {
+          if (chrome.runtime.lastError) {
+            console.warn('[NSV] Could not load chat settings:', chrome.runtime.lastError);
+            resolve();
+            return;
           }
-          (window as any).NSV_SETTINGS = settings;
-          console.log('[NSV] Chat settings preloaded');
           
-          // Envoyer un event pour notifier que les settings sont prêts
-          window.dispatchEvent(
-            new CustomEvent('NSV_SETTINGS_UPDATED', {
-              detail: settings,
-            })
-          );
-        }
-        resolve();
-      });
-    });
+          if (result.chatCustomization) {
+            const settings = { ...result.chatCustomization };
+            if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+              settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
+            }
+            (window as any).NSV_SETTINGS = settings;
+            console.log('[NSV] Chat settings preloaded');
+            
+            // Envoyer un event pour notifier que les settings sont prêts
+            window.dispatchEvent(
+              new CustomEvent('NSV_SETTINGS_UPDATED', {
+                detail: settings,
+              })
+            );
+          }
+          resolve();
+        });
+      }),
+      new Promise<void>((resolve) => setTimeout(resolve, 1000)) // Timeout 1s
+    ]);
   } catch (error) {
     console.warn('[NSV] Error loading chat settings:', error);
   }
@@ -161,29 +179,38 @@ try {
 function initializeContentFeatures() {
   // Utiliser requestIdleCallback si disponible, sinon setTimeout
   const scheduleInit = (window as any).requestIdleCallback || 
-    ((cb: () => void) => setTimeout(cb, 500));
+    ((cb: () => void) => setTimeout(cb, 1000)); // Augmenté à 1s pour laisser la page charger
   
   scheduleInit(async () => {
     try {
-      const { FeatureManager, FeatureContext } = await import('./core');
-      const { ChromeStorageAdapter } = await import('./core/storage-adapter');
-      const { instantiateAllFeatures } = await import('./feature-registry');
+      // Timeout global pour toute l'initialisation
+      await Promise.race([
+        (async () => {
+          const { FeatureManager, FeatureContext } = await import('./core');
+          const { ChromeStorageAdapter } = await import('./core/storage-adapter');
+          const { instantiateAllFeatures } = await import('./feature-registry');
 
-      const contentManager = new FeatureManager({
-        context: FeatureContext.CONTENT_SCRIPT,
-        currentUrl: window.location.href,
-        storage: new ChromeStorageAdapter()
-      });
+          const contentManager = new FeatureManager({
+            context: FeatureContext.CONTENT_SCRIPT,
+            currentUrl: window.location.href,
+            storage: new ChromeStorageAdapter()
+          });
 
-      const allContentFeatures = instantiateAllFeatures();
-      contentManager.registerMany(allContentFeatures);
+          const allContentFeatures = instantiateAllFeatures();
+          contentManager.registerMany(allContentFeatures);
 
-      await contentManager.initializeAll();
-      console.log('[NSV] Content script features initialized');
+          await contentManager.initializeAll();
+          console.log('[NSV] Content script features initialized');
 
-      (window as any).__NSV_CONTENT_MANAGER__ = contentManager;
+          (window as any).__NSV_CONTENT_MANAGER__ = contentManager;
+        })(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Content features initialization timeout')), 10000)
+        )
+      ]);
     } catch (error: any) {
       console.error('[NSV] Failed to initialize content script features:', error);
+      // Ne pas bloquer la page même en cas d'erreur
     }
   });
 }
