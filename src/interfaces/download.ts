@@ -42,7 +42,7 @@ const params = new URLSearchParams(window.location.search);
 const downloadId = params.get('downloadId');
 const filename = params.get('filename');
 const segmentCountStr = params.get('segmentCount');
-const fileFormat = (params.get('fileFormat') || 'ts') as 'ts' | 'mp4';
+const fileFormat = (params.get('fileFormat') || 'mp4') as 'ts' | 'mp4';
 
 if (!downloadId || !filename || !segmentCountStr) {
   updateStatus('❌ Paramètres manquants', 'error');

@@ -45,6 +45,11 @@ const oldFetch = (self as any).fetch;
 (self as any).fetch = async function(input: RequestInfo, init?: RequestInit): Promise<Response> {
   const url = input instanceof Request ? input.url : input.toString();
   
+  // Log toutes les requêtes pour debug
+  if (url.includes('usher.ttvnw.net') || url.includes('.m3u8')) {
+    console.log('[NSV] Intercepting fetch:', url);
+  }
+  
   // Optimisation : Utiliser Promise.race avec timeout pour éviter les blocages
   const fetchWithTimeout = (promise: Promise<Response>, timeoutMs: number = 30000) => {
     return Promise.race([

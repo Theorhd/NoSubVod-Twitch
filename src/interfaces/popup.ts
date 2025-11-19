@@ -667,7 +667,7 @@ async function init(): Promise<void> {
       const qualityLabel = selectedOption.textContent || 'Unknown';
       
       const fileFormatSelect = document.getElementById('fileFormat') as HTMLSelectElement;
-      const fileFormat = (fileFormatSelect.value as 'ts' | 'mp4') || 'ts';
+      const fileFormat = (fileFormatSelect.value as 'ts' | 'mp4') || 'mp4';
       
       await downloadVod(playlistUrl, video, qualityLabel, fileFormat);
     });
@@ -683,7 +683,7 @@ async function init(): Promise<void> {
       
       if (url.endsWith('.m3u8')) {
         const fileFormatSelect = document.getElementById('fileFormat') as HTMLSelectElement;
-        const fileFormat = (fileFormatSelect.value as 'ts' | 'mp4') || 'ts';
+        const fileFormat = (fileFormatSelect.value as 'ts' | 'mp4') || 'mp4';
         await downloadVod(url, { id: 'custom', title: 'Custom VOD', owner: { login: 'unknown' }, lengthSeconds: 0 }, 'Custom', fileFormat);
       } else {
         chrome.downloads.download({ url, saveAs: true }, () => {

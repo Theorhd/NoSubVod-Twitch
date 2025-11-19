@@ -2,7 +2,6 @@ declare const chrome: any;
 
 import { storage, VodDownload, ActiveDownload } from '../utils/storage';
 import { IndexedDBHelper } from '../utils/indexed-db-helper';
-import { VideoCompressor } from '../utils/video-compressor';
 
 const dbHelper = new IndexedDBHelper();
 
@@ -67,7 +66,7 @@ async function downloadVod(
   playlistUrl: string,
   vodInfo: any,
   qualityLabel: string,
-  fileFormat: 'ts' | 'mp4' = 'ts',
+  fileFormat: 'ts' | 'mp4' = 'mp4',
   clipStart: number = 0,
   clipEnd: number = Infinity,
   sendResponse: (response: any) => void
@@ -92,19 +91,16 @@ async function downloadVod(
   await storage.setActiveDownload(activeDownload);
 
   try {
-  // Get settings for compression option
+  // Get settings
   const userSettings = await storage.getSettings();
-  const shouldCompress = userSettings.compressVideo;
-  
-  if (shouldCompress) {
-    console.log('[NoSubVod] Video compression enabled - files will be smaller but download may be slower');
-  }
   
   // Fetch playlist
   const resp = await fetch(playlistUrl);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const playlistText = await resp.text();
 
+    console.log(`[NoSubVod] Playlist fetched, parsing segments...`);
+    
     // Construire la liste des segments avec leurs durées
     const lines = playlistText.split('\n');
     const entries: { url: string; duration: number }[] = [];
@@ -120,18 +116,27 @@ async function downloadVod(
         entries.push({ url, duration: lastDur });
       }
     }
+    
+    console.log(`[NoSubVod] Found ${entries.length} segments in playlist`);
+    console.log(`[NoSubVod] Clip range: ${clipStart}s - ${clipEnd}s`);
+    
     // Appliquer découpage temporel
     const segmentUrls: string[] = [];
     let cumTime = 0;
     for (const e of entries) {
       const segStart = cumTime;
       const segEnd = cumTime + e.duration;
+      // Si clipStart = 0 et clipEnd = Infinity, on prend tout
       if (segEnd > clipStart && segStart < clipEnd) {
         segmentUrls.push(e.url);
       }
       cumTime += e.duration;
     }
+    
+    console.log(`[NoSubVod] Selected ${segmentUrls.length} segments for download (total duration: ${cumTime.toFixed(1)}s)`);
+    
     if (segmentUrls.length === 0) {
+      console.error(`[NoSubVod] No segments found! Total entries: ${entries.length}, clipStart: ${clipStart}, clipEnd: ${clipEnd}`);
       throw new Error('Aucun segment trouvé dans la plage spécifiée');
     }
 
@@ -240,15 +245,6 @@ async function downloadVod(
             throw memError;
           }
           
-          // Compress segment if compression is enabled
-          if (shouldCompress && VideoCompressor.shouldCompress(buf.byteLength)) {
-            try {
-              buf = await VideoCompressor.compressSegment(buf);
-            } catch (compressError: any) {
-              // Compression failed, continue with uncompressed buffer
-            }
-          }
-          
           return { buffer: buf, is403: false };
         } catch (error: any) {
           lastError = error;
@@ -348,11 +344,6 @@ async function downloadVod(
                 
                 // Reset consecutive failures on success
                 consecutiveFailures = 0;
-                
-                // Log compression info for first segment
-                if (successfulSegments === 1 && shouldCompress) {
-                  console.log(`[NoSubVod] First segment compressed and stored`);
-                }
               } catch (storeError: any) {
                 console.error(`[NoSubVod] Failed to store segment ${segmentIndex + 1}:`, storeError.message);
                 failedCount++;
@@ -459,13 +450,6 @@ async function downloadVod(
     console.log(`[NoSubVod] ⚡ Average speed: ${formatBytes(avgSpeed)}/s`);
     console.log(`[NoSubVod] 🚀 Parallel downloads: ${chunkSize} concurrent`);
     
-    if (shouldCompress) {
-      const estimatedOriginalSize = segmentUrls.length * 1024 * 1024; // ~1MB per segment
-      const savings = estimatedOriginalSize - totalBytes;
-      const savingsPercent = Math.round((savings / estimatedOriginalSize) * 100);
-      console.log(`[NoSubVod] 🗜️  Compression saved: ${formatBytes(savings)} (~${savingsPercent}%)`);
-    }
-    
     if (total403Errors > 0) {
       console.log(`[NoSubVod] ℹ️  Note: ${total403Errors} segments were blocked due to copyright (music/audio). These parts will be missing from the downloaded VOD.`);
     }
@@ -491,7 +475,15 @@ async function downloadVod(
     
     // Determine file extension based on format
     const fileExtension = fileFormat === 'mp4' ? 'mp4' : 'ts';
-    const filename = `twitch_vod_${vodInfo.id}.${fileExtension}`;
+    
+    // Sanitize title for filename (remove invalid characters)
+    const sanitizedTitle = (vodInfo.title || 'Untitled VOD')
+      .replace(/[<>:"/\\|?*]/g, '') // Remove invalid filename characters
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .trim()
+      .substring(0, 150); // Limit length to avoid too long filenames
+    
+    const filename = `${sanitizedTitle}.${fileExtension}`;
     
     // Open download page (this has user context for showSaveFilePicker)
     const downloadUrl = chrome.runtime.getURL('dist/download.html') +
@@ -568,7 +560,7 @@ chrome.runtime.onMessage.addListener(
         req.playlistUrl,
         req.vodInfo,
         req.qualityLabel,
-        req.fileFormat ?? 'ts',
+        req.fileFormat ?? 'mp4',
         req.clipStart ?? 0,
         req.clipEnd ?? Infinity,
         sendResponse

@@ -16,6 +16,8 @@ export interface VodDownload {
   success: boolean;
 }
 
+export type CompressionType = 'none' | 'lossless' | 'lossy';
+
 export interface Settings {
   defaultQuality: string; // '1080p60', '720p60', etc.
   defaultFileFormat: 'ts' | 'mp4';
@@ -27,6 +29,8 @@ export interface Settings {
   theme: 'dark' | 'light' | 'auto';
   debugMode: boolean;
   compressVideo: boolean; // Compress video to reduce file size
+  compressionType: CompressionType; // Type of compression: none, lossless, or lossy
+  includeChat: boolean; // Include Twitch chat in download as subtitle track
 }
 
 export interface ActiveDownload {
@@ -45,7 +49,7 @@ export interface ActiveDownload {
 
 const DEFAULT_SETTINGS: Settings = {
   defaultQuality: 'Source',
-  defaultFileFormat: 'ts',
+  defaultFileFormat: 'mp4',
   enableNotifications: true,
   autoCleanupDays: 30,
   showThumbnails: true,
@@ -53,7 +57,9 @@ const DEFAULT_SETTINGS: Settings = {
   downloadChunkSize: 5,
   theme: 'dark',
   debugMode: false,
-  compressVideo: true
+  compressVideo: false, // Désactivé par défaut pour éviter les problèmes de lecture
+  compressionType: 'lossless',
+  includeChat: true
 };
 
 class StorageManager {
