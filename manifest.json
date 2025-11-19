@@ -1,6 +1,6 @@
 {
   "name": "nosubvod-twitch",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Show sub-only VOD on Twitch",
   "manifest_version": 3,
   "action": {

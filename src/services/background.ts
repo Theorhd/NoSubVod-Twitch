@@ -545,7 +545,13 @@ async function downloadVod(
     
     // Determine file extension based on format
     const fileExtension = fileFormat === 'mp4' ? 'mp4' : 'ts';
-    const filename = `twitch_vod_${vodInfo.id}.${fileExtension}`;
+    // Nettoyer le titre pour en faire un nom de fichier valide
+    const cleanTitle = (vodInfo.title || `vod_${vodInfo.id}`)
+      .replace(/[<>:"\/\\|?*]/g, '') // Supprimer les caractères invalides
+      .replace(/\s+/g, ' ') // Normaliser les espaces
+      .trim()
+      .substring(0, 200); // Limiter la longueur
+    const filename = `${cleanTitle}.${fileExtension}`;
     
     // Open download page (this has user context for showSaveFilePicker)
     const downloadUrl = chrome.runtime.getURL('dist/download.html') +

@@ -49,7 +49,7 @@ export interface ActiveDownload {
 
 const DEFAULT_SETTINGS: Settings = {
   defaultQuality: 'Source',
-  defaultFileFormat: 'ts',
+  defaultFileFormat: 'mp4',
   enableNotifications: true,
   autoCleanupDays: 30,
   showThumbnails: true,
