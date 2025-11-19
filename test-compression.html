@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Compression VideoCompressor</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #0e0e10;
+      color: #e3e3e3;
+    }
+    h1 {
+      background: linear-gradient(90deg, #9146FF, #b366ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .test-section {
+      background: #18181b;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      border: 1px solid #2f2f37;
+    }
+    .result {
+      background: #0e0e10;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .success { color: #4caf50; }
+    .warning { color: #ffa500; }
+    .info { color: #00bfff; }
+    button {
+      background: linear-gradient(135deg, #9146FF, #b366ff);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 12px;
+      margin-bottom: 12px;
+    }
+    button:hover {
+      background: linear-gradient(135deg, #a45fff, #c589f5);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .stat-card {
+      background: #0e0e10;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #2f2f37;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #adadb8;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #9146FF;
+    }
+  </style>
+</head>
+<body>
+  <h1>🗜️ Test du VideoCompressor</h1>
+  
+  <div class="test-section">
+    <h2>Générer un buffer TS de test</h2>
+    <button onclick="generateTestBuffer(1)">Générer 1 MB</button>
+    <button onclick="generateTestBuffer(5)">Générer 5 MB</button>
+    <button onclick="generateTestBuffer(10)">Générer 10 MB</button>
+    <div id="buffer-result" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Compression LossLess</h2>
+    <button onclick="testCompression('lossless', 'fast')">Fast</button>
+    <button onclick="testCompression('lossless', 'balanced')">Balanced</button>
+    <button onclick="testCompression('lossless', 'maximum')">Maximum</button>
+    <div id="lossless-result" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Compression Lossy</h2>
+    <button onclick="testCompression('lossy', 'fast')">Fast</button>
+    <button onclick="testCompression('lossy', 'balanced')">Balanced</button>
+    <button onclick="testCompression('lossy', 'maximum')">Maximum</button>
+    <div id="lossy-result" class="result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>Comparaison</h2>
+    <button onclick="runComparison()">Comparer tous les modes</button>
+    <div id="comparison-result" class="stats-grid"></div>
+  </div>
+
+  <script type="module">
+    import { VideoCompressor, CompressionLevel, CompressionMode } from './src/utils/video-compressor.js';
+    
+    let testBuffer = null;
+    
+    window.generateTestBuffer = function(sizeMB) {
+      const TS_PACKET_SIZE = 188;
+      const SYNC_BYTE = 0x47;
+      const totalPackets = Math.floor((sizeMB * 1024 * 1024) / TS_PACKET_SIZE);
+      
+      const buffer = new ArrayBuffer(totalPackets * TS_PACKET_SIZE);
+      const view = new Uint8Array(buffer);
+      
+      // Générer des paquets TS valides
+      for (let i = 0; i < totalPackets; i++) {
+        const offset = i * TS_PACKET_SIZE;
+        
+        // Sync byte
+        view[offset] = SYNC_BYTE;
+        
+        // Décider du type de paquet (30% null, 70% data)
+        if (Math.random() < 0.3) {
+          // Paquet null (PID 0x1FFF)
+          view[offset + 1] = 0x1F;
+          view[offset + 2] = 0xFF;
+        } else {
+          // Paquet de données avec PID aléatoire
+          const pid = Math.floor(Math.random() * 0x1000);
+          view[offset + 1] = (pid >> 8) & 0x1F;
+          view[offset + 2] = pid & 0xFF;
+        }
+        
+        // Flags et compteur
+        view[offset + 3] = Math.floor(Math.random() * 256);
+        
+        // Adaptation field aléatoire (50% de chances)
+        if (Math.random() < 0.5) {
+          const adaptLength = Math.floor(Math.random() * 150) + 10;
+          view[offset + 4] = adaptLength;
+          // Remplir avec du padding
+          for (let j = 5; j < Math.min(5 + adaptLength, TS_PACKET_SIZE); j++) {
+            view[offset + j] = 0xFF;
+          }
+        }
+        
+        // Remplir le reste avec des données aléatoires
+        for (let j = 5; j < TS_PACKET_SIZE; j++) {
+          if (view[offset + j] === 0) {
+            view[offset + j] = Math.floor(Math.random() * 256);
+          }
+        }
+      }
+      
+      testBuffer = buffer;
+      
+      const stats = VideoCompressor.analyzeBuffer(buffer);
+      document.getElementById('buffer-result').innerHTML = `
+        <span class="success">✓ Buffer généré avec succès</span><br>
+        Taille: ${(buffer.byteLength / 1024 / 1024).toFixed(2)} MB<br>
+        Paquets totaux: ${stats.totalPackets}<br>
+        Paquets null: ${stats.nullPackets} (${((stats.nullPackets / stats.totalPackets) * 100).toFixed(1)}%)<br>
+        Paquets data: ${stats.dataPackets}<br>
+        Taille moyenne adaptation field: ${stats.averageAdaptationFieldSize.toFixed(1)} bytes<br>
+        <span class="info">Économies estimées: ${(stats.estimatedSavings * 100).toFixed(1)}%</span>
+      `;
+    };
+    
+    window.testCompression = async function(mode, level) {
+      if (!testBuffer) {
+        alert('Générez d\'abord un buffer de test !');
+        return;
+      }
+      
+      const resultId = mode === 'lossless' ? 'lossless-result' : 'lossy-result';
+      document.getElementById(resultId).innerHTML = '<span class="warning">⏳ Compression en cours...</span>';
+      
+      const compressionMode = mode === 'lossless' ? CompressionMode.LOSSLESS : CompressionMode.LOSSY;
+      let compressionLevel;
+      
+      switch(level) {
+        case 'fast': compressionLevel = CompressionLevel.FAST; break;
+        case 'balanced': compressionLevel = CompressionLevel.BALANCED; break;
+        case 'maximum': compressionLevel = CompressionLevel.MAXIMUM; break;
+      }
+      
+      const startTime = performance.now();
+      const compressed = await VideoCompressor.compressSegment(testBuffer, compressionLevel, compressionMode);
+      const duration = performance.now() - startTime;
+      
+      const originalSize = testBuffer.byteLength;
+      const compressedSize = compressed.byteLength;
+      const ratio = compressedSize / originalSize;
+      const reduction = ((1 - ratio) * 100).toFixed(1);
+      
+      document.getElementById(resultId).innerHTML = `
+        <span class="success">✓ Compression ${mode.toUpperCase()} - ${level.toUpperCase()} terminée</span><br>
+        Taille originale: ${(originalSize / 1024 / 1024).toFixed(2)} MB<br>
+        Taille compressée: ${(compressedSize / 1024 / 1024).toFixed(2)} MB<br>
+        <span class="info">Réduction: ${reduction}% (ratio: ${ratio.toFixed(3)})</span><br>
+        Durée: ${duration.toFixed(0)} ms<br>
+        Vitesse: ${((originalSize / 1024 / 1024) / (duration / 1000)).toFixed(2)} MB/s
+      `;
+    };
+    
+    window.runComparison = async function() {
+      if (!testBuffer) {
+        alert('Générez d\'abord un buffer de test !');
+        return;
+      }
+      
+      const container = document.getElementById('comparison-result');
+      container.innerHTML = '<span class="warning">⏳ Comparaison en cours...</span>';
+      
+      const results = [];
+      const modes = [
+        { mode: CompressionMode.LOSSLESS, level: CompressionLevel.FAST, name: 'LossLess Fast' },
+        { mode: CompressionMode.LOSSLESS, level: CompressionLevel.BALANCED, name: 'LossLess Balanced' },
+        { mode: CompressionMode.LOSSLESS, level: CompressionLevel.MAXIMUM, name: 'LossLess Maximum' },
+        { mode: CompressionMode.LOSSY, level: CompressionLevel.FAST, name: 'Lossy Fast' },
+        { mode: CompressionMode.LOSSY, level: CompressionLevel.BALANCED, name: 'Lossy Balanced' },
+        { mode: CompressionMode.LOSSY, level: CompressionLevel.MAXIMUM, name: 'Lossy Maximum' }
+      ];
+      
+      for (const config of modes) {
+        const startTime = performance.now();
+        const compressed = await VideoCompressor.compressSegment(testBuffer, config.level, config.mode);
+        const duration = performance.now() - startTime;
+        
+        const reduction = ((1 - (compressed.byteLength / testBuffer.byteLength)) * 100).toFixed(1);
+        
+        results.push({
+          name: config.name,
+          size: (compressed.byteLength / 1024 / 1024).toFixed(2),
+          reduction,
+          duration: duration.toFixed(0)
+        });
+      }
+      
+      container.innerHTML = results.map(r => `
+        <div class="stat-card">
+          <div class="stat-label">${r.name}</div>
+          <div class="stat-value">${r.reduction}%</div>
+          <div class="stat-label" style="margin-top: 8px;">
+            ${r.size} MB • ${r.duration}ms
+          </div>
+        </div>
+      `).join('');
+    };
+    
+    // Générer automatiquement un buffer de 5MB au chargement
+    window.addEventListener('load', () => {
+      generateTestBuffer(5);
+    });
+  </script>
+</body>
+</html>

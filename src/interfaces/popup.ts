@@ -281,6 +281,7 @@ async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: stri
   const btn = document.getElementById('downloadBtn') as HTMLButtonElement;
   const startTimeInput = document.getElementById('startTime') as HTMLInputElement;
   const endTimeInput = document.getElementById('endTime') as HTMLInputElement;
+  const includeChatCheckbox = document.getElementById('includeChat') as HTMLInputElement;
 
   error.textContent = '';
   success.textContent = '';
@@ -298,7 +299,8 @@ async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: stri
         qualityLabel,
         fileFormat,
         clipStart: parseTime(startTimeInput.value) ?? 0,
-        clipEnd: parseTime(endTimeInput.value) ?? Infinity
+        clipEnd: parseTime(endTimeInput.value) ?? Infinity,
+        includeChat: includeChatCheckbox?.checked ?? false
       },
       (response: any) => {
         if (chrome.runtime.lastError) {
@@ -561,6 +563,19 @@ async function init(): Promise<void> {
   const thumbnailEl = document.getElementById('thumbnail')! as HTMLImageElement;
   const clearHistoryBtn = document.getElementById('clearHistory')!;
   const saveSettingsBtn = document.getElementById('saveSettings')!;
+  const includeChatCheckbox = document.getElementById('includeChat') as HTMLInputElement;
+  const chatInfoEl = document.getElementById('chatInfo') as HTMLElement;
+  
+  // Show/hide chat info when checkbox is toggled
+  if (includeChatCheckbox && chatInfoEl) {
+    includeChatCheckbox.addEventListener('change', () => {
+      chatInfoEl.style.display = includeChatCheckbox.checked ? 'block' : 'none';
+    });
+    // Show initially if checked
+    if (includeChatCheckbox.checked) {
+      chatInfoEl.style.display = 'block';
+    }
+  }
   
   clearHistoryBtn.addEventListener('click', clearHistory);
   saveSettingsBtn.addEventListener('click', saveSettings);

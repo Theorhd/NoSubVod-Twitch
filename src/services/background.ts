@@ -2,7 +2,9 @@ declare const chrome: any;
 
 import { storage, VodDownload, ActiveDownload } from '../utils/storage';
 import { IndexedDBHelper } from '../utils/indexed-db-helper';
-import { VideoCompressor } from '../utils/video-compressor';
+import { VideoCompressor, CompressionMode, CompressionLevel } from '../utils/video-compressor';
+import { getCompressionConfig } from '../utils/compression-config';
+import { ChatDownloader } from '../utils/chat-downloader';
 
 const dbHelper = new IndexedDBHelper();
 
@@ -14,6 +16,7 @@ interface DownloadRequest {
   fileFormat?: 'ts' | 'mp4';
   clipStart?: number;
   clipEnd?: number;
+  includeChat?: boolean;
 }
 
 interface DownloadProgress {
@@ -36,6 +39,8 @@ const downloadMetadata = new Map<string, {
   failedCount: number;
   segmentCount: number;
   fileFormat: 'ts' | 'mp4';
+  includeChat: boolean;
+  chatData?: string; // WebVTT data
 }>();
 
 function showNotification(title: string, message: string) {
@@ -70,6 +75,7 @@ async function downloadVod(
   fileFormat: 'ts' | 'mp4' = 'ts',
   clipStart: number = 0,
   clipEnd: number = Infinity,
+  includeChat: boolean = false,
   sendResponse: (response: any) => void
 ): Promise<void> {
   const downloadId = `${vodInfo.id}_${Date.now()}`;
@@ -94,10 +100,15 @@ async function downloadVod(
   try {
   // Get settings for compression option
   const userSettings = await storage.getSettings();
-  const shouldCompress = userSettings.compressVideo;
+  const compressionConfig = getCompressionConfig(
+    userSettings.compressVideo,
+    userSettings.compressionType
+  );
   
-  if (shouldCompress) {
-    console.log('[NoSubVod] Video compression enabled - files will be smaller but download may be slower');
+  if (compressionConfig.enabled) {
+    const modeStr = compressionConfig.mode === CompressionMode.LOSSLESS ? 'LossLess' : 'Lossy';
+    console.log(`[NoSubVod] Video compression enabled: ${modeStr} mode`);
+    console.log('[NoSubVod] Files will be smaller but download may be slightly slower');
   }
   
   // Fetch playlist
@@ -105,6 +116,8 @@ async function downloadVod(
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const playlistText = await resp.text();
 
+    console.log(`[NoSubVod] Playlist fetched, parsing segments...`);
+    
     // Construire la liste des segments avec leurs durées
     const lines = playlistText.split('\n');
     const entries: { url: string; duration: number }[] = [];
@@ -120,18 +133,27 @@ async function downloadVod(
         entries.push({ url, duration: lastDur });
       }
     }
+    
+    console.log(`[NoSubVod] Found ${entries.length} segments in playlist`);
+    console.log(`[NoSubVod] Clip range: ${clipStart}s - ${clipEnd}s`);
+    
     // Appliquer découpage temporel
     const segmentUrls: string[] = [];
     let cumTime = 0;
     for (const e of entries) {
       const segStart = cumTime;
       const segEnd = cumTime + e.duration;
+      // Si clipStart = 0 et clipEnd = Infinity, on prend tout
       if (segEnd > clipStart && segStart < clipEnd) {
         segmentUrls.push(e.url);
       }
       cumTime += e.duration;
     }
+    
+    console.log(`[NoSubVod] Selected ${segmentUrls.length} segments for download (total duration: ${cumTime.toFixed(1)}s)`);
+    
     if (segmentUrls.length === 0) {
+      console.error(`[NoSubVod] No segments found! Total entries: ${entries.length}, clipStart: ${clipStart}, clipEnd: ${clipEnd}`);
       throw new Error('Aucun segment trouvé dans la plage spécifiée');
     }
 
@@ -241,10 +263,15 @@ async function downloadVod(
           }
           
           // Compress segment if compression is enabled
-          if (shouldCompress && VideoCompressor.shouldCompress(buf.byteLength)) {
+          if (compressionConfig.enabled && VideoCompressor.shouldCompress(buf.byteLength)) {
             try {
-              buf = await VideoCompressor.compressSegment(buf);
+              buf = await VideoCompressor.compressSegment(
+                buf,
+                compressionConfig.level,
+                compressionConfig.mode
+              );
             } catch (compressError: any) {
+              console.warn('[NoSubVod] Compression failed, using uncompressed segment:', compressError.message);
               // Compression failed, continue with uncompressed buffer
             }
           }
@@ -350,8 +377,9 @@ async function downloadVod(
                 consecutiveFailures = 0;
                 
                 // Log compression info for first segment
-                if (successfulSegments === 1 && shouldCompress) {
-                  console.log(`[NoSubVod] First segment compressed and stored`);
+                if (successfulSegments === 1 && compressionConfig.enabled) {
+                  const modeStr = compressionConfig.mode === CompressionMode.LOSSLESS ? 'LossLess' : 'Lossy';
+                  console.log(`[NoSubVod] First segment compressed (${modeStr}) and stored`);
                 }
               } catch (storeError: any) {
                 console.error(`[NoSubVod] Failed to store segment ${segmentIndex + 1}:`, storeError.message);
@@ -459,11 +487,12 @@ async function downloadVod(
     console.log(`[NoSubVod] ⚡ Average speed: ${formatBytes(avgSpeed)}/s`);
     console.log(`[NoSubVod] 🚀 Parallel downloads: ${chunkSize} concurrent`);
     
-    if (shouldCompress) {
+    if (compressionConfig.enabled) {
       const estimatedOriginalSize = segmentUrls.length * 1024 * 1024; // ~1MB per segment
       const savings = estimatedOriginalSize - totalBytes;
       const savingsPercent = Math.round((savings / estimatedOriginalSize) * 100);
-      console.log(`[NoSubVod] 🗜️  Compression saved: ${formatBytes(savings)} (~${savingsPercent}%)`);
+      const modeStr = compressionConfig.mode === CompressionMode.LOSSLESS ? 'LossLess' : 'Lossy';
+      console.log(`[NoSubVod] 🗜️  Compression (${modeStr}) saved: ${formatBytes(savings)} (~${savingsPercent}%)`);
     }
     
     if (total403Errors > 0) {
@@ -478,6 +507,29 @@ async function downloadVod(
     
     console.log('[NoSubVod] All segments already stored in IndexedDB');
     
+    // Download chat if requested
+    let chatData: string | undefined;
+    if (includeChat) {
+      console.log('[NoSubVod] 💬 Downloading Twitch chat replay...');
+      try {
+        const chatMessages = await ChatDownloader.downloadChat(vodInfo.id, (progress) => {
+          console.log(`[NoSubVod] Chat download progress: ${progress.current} messages (${progress.percent}%)`);
+        });
+        
+        // Convert to WebVTT format
+        chatData = ChatDownloader.convertToWebVTT(chatMessages);
+        console.log(`[NoSubVod] ✓ Chat downloaded: ${chatMessages.length} messages converted to WebVTT`);
+        
+        // Store chat data in IndexedDB
+        await dbHelper.storeChatData(downloadId, chatData);
+        console.log('[NoSubVod] Chat data stored in IndexedDB');
+      } catch (chatError: any) {
+        console.error('[NoSubVod] Chat download failed:', chatError);
+        // Continue without chat - don't fail the entire download
+        chatData = undefined;
+      }
+    }
+    
     // Store metadata for completion handling
     downloadMetadata.set(downloadId, {
       vodInfo,
@@ -486,7 +538,9 @@ async function downloadVod(
       totalBytes,
       failedCount,
       segmentCount: successfulSegments,
-      fileFormat
+      fileFormat,
+      includeChat,
+      chatData
     });
     
     // Determine file extension based on format
@@ -498,7 +552,8 @@ async function downloadVod(
       `?downloadId=${encodeURIComponent(downloadId)}` +
       `&filename=${encodeURIComponent(filename)}` +
       `&segmentCount=${successfulSegments}` +
-      `&fileFormat=${encodeURIComponent(fileFormat)}`;
+      `&fileFormat=${encodeURIComponent(fileFormat)}` +
+      `&includeChat=${includeChat ? '1' : '0'}`;
     
     chrome.tabs.create({ url: downloadUrl });
 
@@ -571,6 +626,7 @@ chrome.runtime.onMessage.addListener(
         req.fileFormat ?? 'ts',
         req.clipStart ?? 0,
         req.clipEnd ?? Infinity,
+        req.includeChat ?? false,
         sendResponse
       );
       return true; // Keep message channel open for async response

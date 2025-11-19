@@ -76,10 +76,47 @@ export class IndexedDBHelper {
       const key = `${downloadId}_${i}`;
       store.delete(key);
     }
+    
+    // Also delete chat data if exists
+    const chatKey = `${downloadId}_chat`;
+    store.delete(chatKey);
 
     return new Promise((resolve, reject) => {
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
+    });
+  }
+  
+  async storeChatData(downloadId: string, chatData: string): Promise<void> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readwrite');
+      const store = transaction.objectStore(this.storeName);
+      const key = `${downloadId}_chat`;
+
+      const request = store.put({ id: key, data: chatData });
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getChatData(downloadId: string): Promise<string | null> {
+    if (!this.db) await this.init();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readonly');
+      const store = transaction.objectStore(this.storeName);
+      const key = `${downloadId}_chat`;
+
+      const request = store.get(key);
+
+      request.onsuccess = () => {
+        const result = request.result;
+        resolve(result ? result.data : null);
+      };
+      request.onerror = () => reject(request.error);
     });
   }
 

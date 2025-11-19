@@ -6,6 +6,69 @@ import { storage } from '../utils/storage';
 
 const dbHelper = new IndexedDBHelper();
 
+// Download chat subtitle file
+async function downloadChatFile(downloadId: string, videoFilename: string): Promise<void> {
+  try {
+    console.log('[NoSubVod Download] Downloading chat subtitle file...');
+    updateStatus('💬 Téléchargement du chat...');
+    
+    // Get chat data from IndexedDB
+    const chatData = await dbHelper.getChatData(downloadId);
+    
+    if (!chatData) {
+      console.log('[NoSubVod Download] No chat data found, skipping');
+      return;
+    }
+    
+    // Create blob from chat data
+    const chatBlob = new Blob([chatData], { type: 'text/vtt' });
+    const chatBlobUrl = URL.createObjectURL(chatBlob);
+    
+    // Generate chat filename (same as video but with .vtt extension)
+    const chatFilename = videoFilename.replace(/\.(ts|mp4)$/, '.vtt');
+    
+    // Download chat file
+    await new Promise<void>((resolve, reject) => {
+      chrome.downloads.download({
+        url: chatBlobUrl,
+        filename: chatFilename,
+        saveAs: false // Auto-save in same location as video
+      }, (id: number) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          console.log('[NoSubVod Download] Chat file download started with ID:', id);
+          
+          // Wait for download to complete
+          const checkInterval = setInterval(() => {
+            chrome.downloads.search({ id }, (downloads: any[]) => {
+              if (downloads.length > 0) {
+                const dl = downloads[0];
+                if (dl.state === 'complete') {
+                  clearInterval(checkInterval);
+                  URL.revokeObjectURL(chatBlobUrl);
+                  console.log('[NoSubVod Download] ✓ Chat file downloaded successfully');
+                  resolve();
+                } else if (dl.state === 'interrupted') {
+                  clearInterval(checkInterval);
+                  URL.revokeObjectURL(chatBlobUrl);
+                  console.warn('[NoSubVod Download] Chat download interrupted:', dl.error);
+                  resolve(); // Don't fail the entire process
+                }
+              }
+            });
+          }, 500);
+        }
+      });
+    });
+    
+    updateStatus('✅ Chat téléchargé !', 'success');
+  } catch (error: any) {
+    console.error('[NoSubVod Download] Chat download failed:', error);
+    // Don't fail the entire download for chat errors
+  }
+}
+
 const statusEl = document.getElementById('status') as HTMLElement;
 const infoEl = document.getElementById('info') as HTMLElement;
 const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
@@ -43,6 +106,7 @@ const downloadId = params.get('downloadId');
 const filename = params.get('filename');
 const segmentCountStr = params.get('segmentCount');
 const fileFormat = (params.get('fileFormat') || 'ts') as 'ts' | 'mp4';
+const includeChat = params.get('includeChat') === '1';
 
 if (!downloadId || !filename || !segmentCountStr) {
   updateStatus('❌ Paramètres manquants', 'error');
@@ -53,9 +117,17 @@ if (!downloadId || !filename || !segmentCountStr) {
   
   // Check if compression was used
   storage.getSettings().then(settings => {
-    const compressionNote = settings.compressVideo 
-      ? '<br><span style="color: #4caf50;">🗜️ Compression activée - taille réduite d\'environ 15%</span>' 
-      : '';
+    let compressionNote = '';
+    
+    if (settings.compressVideo && settings.compressionType !== 'none') {
+      const compressionType = settings.compressionType || 'lossless';
+      
+      if (compressionType === 'lossless') {
+        compressionNote = '<br><span style="color: #4caf50;">💎 Compression activée - taille réduite d\'environ 5-10% sans perte de qualité</span>';
+      } else if (compressionType === 'lossy') {
+        compressionNote = '<br><span style="color: #4caf50;">💎 Compression activée - taille réduite d\'environ 5-10% sans perte de qualité</span>';
+      }
+    }
     
     infoEl.innerHTML = `
       <strong>Prêt à télécharger votre VOD !</strong><br>
@@ -125,26 +197,51 @@ startBtn.addEventListener('click', async () => {
     // Load and concatenate segments in batches to avoid memory overflow
     const BATCH_SIZE = 100; // Process 100 segments at a time
     const blobParts: Blob[] = [];
+    let missingSegments = 0;
+    
+    // Create a small null TS packet as placeholder for missing segments
+    // This maintains stream continuity even if some segments are missing (copyright blocks)
+    const createNullSegment = (): ArrayBuffer => {
+      // Create a minimal TS segment with NULL packets (188 bytes each)
+      // A typical segment is ~10 seconds, but we use a much smaller placeholder
+      const nullPacketCount = 10; // Just 10 packets = 1880 bytes
+      const buffer = new ArrayBuffer(188 * nullPacketCount);
+      const view = new Uint8Array(buffer);
+      
+      // Fill with NULL packets (sync byte 0x47, PID 0x1FFF)
+      for (let i = 0; i < nullPacketCount; i++) {
+        const offset = i * 188;
+        view[offset] = 0x47; // Sync byte
+        view[offset + 1] = 0x1F; // PID high byte (NULL PID = 0x1FFF)
+        view[offset + 2] = 0xFF; // PID low byte
+        view[offset + 3] = 0x10; // Adaptation field control
+        // Rest is zeros (padding)
+      }
+      
+      return buffer;
+    };
     
     for (let batchStart = 0; batchStart < segmentCount; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, segmentCount);
       const batchBuffers: ArrayBuffer[] = [];
       
-      // Load one batch
+      // Load one batch - IMPORTANT: maintain segment order
       for (let i = batchStart; i < batchEnd; i++) {
         const segment = await dbHelper.getSegment(downloadId, i);
         
         if (!segment) {
-          console.warn(`[NoSubVod Download] Segment ${i} not found, skipping`);
-          continue;
+          console.warn(`[NoSubVod Download] Segment ${i} not found, using NULL placeholder`);
+          // Use a minimal NULL segment as placeholder to maintain stream continuity
+          batchBuffers.push(createNullSegment());
+          missingSegments++;
+        } else {
+          batchBuffers.push(segment);
         }
-        
-        batchBuffers.push(segment);
         
         updateProgress(i + 1, segmentCount);
         
         if ((i + 1) % 50 === 0 || i === segmentCount - 1) {
-          console.log(`[NoSubVod Download] Loaded ${i + 1}/${segmentCount} segments`);
+          console.log(`[NoSubVod Download] Loaded ${i + 1}/${segmentCount} segments (${missingSegments} missing)`);
           if (progressSpeed) {
             progressSpeed.textContent = `${i + 1}/${segmentCount} segments`;
           }
@@ -161,12 +258,17 @@ startBtn.addEventListener('click', async () => {
     
     updateStatus('Création du fichier...');
     
+    if (missingSegments > 0) {
+      console.log(`[NoSubVod Download] ⚠️ ${missingSegments} segments missing (replaced with NULL packets)`);
+    }
+    
     // Determine MIME type based on format
     const mimeType = fileFormat === 'mp4' ? 'video/mp4' : 'video/mp2t';
     
     // Create final blob from all batch blobs
     const blob = new Blob(blobParts, { type: mimeType });
     console.log(`[NoSubVod Download] Final blob created (${fileFormat}), size: ${blob.size}`);
+    console.log(`[NoSubVod Download] Total segments in file: ${segmentCount}, Missing: ${missingSegments}`);
     
     updateStatus('Préparation du téléchargement...');
     
@@ -206,6 +308,11 @@ startBtn.addEventListener('click', async () => {
               console.log('[NoSubVod Download] Download completed successfully');
               URL.revokeObjectURL(blobUrl);
               updateStatus('✅ Téléchargement terminé !', 'success');
+              
+              // Download chat if included
+              if (includeChat && downloadId) {
+                await downloadChatFile(downloadId, filename);
+              }
               
               // Clean up IndexedDB
               await dbHelper.deleteDownload(downloadId, segmentCount);

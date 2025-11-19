@@ -167,6 +167,19 @@
           </select>
           <button id="downloadBtn" disabled style="width:48%;">Télécharger la VOD</button>
         </div>
+        <div class="setting-item" style="background: #18181b; padding: 8px; border-radius: 6px; margin-bottom: 8px;">
+          <div>
+            <div class="setting-label">💬 Inclure le chat Twitch</div>
+            <div class="setting-desc">Télécharger le chat synchronisé (désactivable dans VLC)</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="includeChat" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="muted" id="chatInfo" style="font-size: 11px; margin-bottom: 8px; padding: 6px; background: #18181b; border-radius: 4px; display: none;">
+          ℹ️ Le chat sera téléchargé en fichier .vtt séparé. Dans VLC : Sous-titres → Ajouter un fichier de sous-titres
+        </div>
         <div class="row">
           <input id="customUrl" type="text" placeholder="Ou collez une URL vidéo directe…">
         </div>

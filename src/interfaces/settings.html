@@ -679,19 +679,35 @@
               <span class="feature-badge new">Nouveau</span>
             </div>
             <div class="feature-description">
-              Compresse la vidéo pendant le téléchargement pour réduire la taille du fichier d'environ 30-50%. 
-              Le processus sera plus lent mais économisera beaucoup d'espace disque.
-            </div>
-            <div class="info-box" style="margin-top: 8px;">
-              ⚙️ <strong>Comment ça marche ?</strong> Supprime les paquets de remplissage (null packets) 
-              du stream MPEG-TS pour réduire la taille sans perte de qualité vidéo visible.
-              Typiquement ~15% de réduction pour un VOD standard.
+              Compresse la vidéo pendant le téléchargement pour réduire la taille du fichier. 
+              Choisissez entre compression sans perte ou avec optimisation qualité/poids.
             </div>
           </div>
           <label class="toggle">
             <input type="checkbox" id="download-compress">
             <span class="toggle-slider"></span>
           </label>
+        </div>
+        
+        <div class="input-group" id="compression-type-container" style="margin-top: 16px;">
+          <label class="input-label">Type de Compression</label>
+          <select id="compression-type">
+            <option value="none">🚫 Aucune compression</option>
+            <option value="lossless">💎 LossLess (Sans perte)</option>
+            <option value="lossy">⚡ Lossy (Optimisé taille)</option>
+          </select>
+          
+          <div class="info-box" style="margin-top: 8px;">
+            <strong>💎 LossLess (Recommandé) :</strong> Supprime uniquement les paquets NULL (padding inutile) 
+            du stream MPEG-TS. <strong>Aucune perte de qualité vidéo/audio</strong>. Réduction typique : ~5-10%.
+            <br><br>
+            <strong>⚡ Lossy :</strong> Actuellement identique à LossLess (compression plus agressive désactivée car elle corrompt les fichiers).
+            Réduction typique : ~5-10%, qualité préservée.
+            <br><br>
+            <strong>🚫 Aucune :</strong> Téléchargement brut sans compression. Qualité maximale garantie mais fichiers légèrement plus volumineux (~5-10%).
+            <br><br>
+            <strong>ℹ️ Note :</strong> La compression TS est limitée pour éviter la corruption des fichiers. Pour une vraie compression, utilisez HandBrake ou ffmpeg après le téléchargement.
+          </div>
         </div>
         
         <div class="feature-item">

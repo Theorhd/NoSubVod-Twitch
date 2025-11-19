@@ -5,7 +5,7 @@
 
 declare const chrome: any;
 
-import { storage, Settings } from '../utils/storage';
+import { storage, Settings, CompressionType } from '../utils/storage';
 import { badgeManager, PRESET_BADGES } from '../utils/badge-manager';
 
 // Types
@@ -118,11 +118,15 @@ class SettingsManager {
     (document.getElementById('download-quality') as HTMLSelectElement).value = settings.defaultQuality;
     (document.getElementById('download-chunks') as HTMLInputElement).value = settings.downloadChunkSize.toString();
     (document.getElementById('download-compress') as HTMLInputElement).checked = settings.compressVideo || false;
+    (document.getElementById('compression-type') as HTMLSelectElement).value = settings.compressionType || 'lossless';
     (document.getElementById('download-notifications') as HTMLInputElement).checked = settings.enableNotifications;
     (document.getElementById('download-thumbnails') as HTMLInputElement).checked = settings.showThumbnails;
     (document.getElementById('history-max') as HTMLInputElement).value = settings.maxHistoryItems.toString();
     (document.getElementById('history-cleanup') as HTMLInputElement).value = settings.autoCleanupDays.toString();
     (document.getElementById('advanced-debug') as HTMLInputElement).checked = settings.debugMode || false;
+    
+    // Show/hide compression type based on compress toggle
+    this.updateCompressionTypeVisibility();
   }
 
   /**
@@ -175,6 +179,12 @@ class SettingsManager {
       if (chatSection) {
         chatSection.style.opacity = (e.target as HTMLInputElement).checked ? '1' : '0.5';
       }
+    });
+    
+    // Compression toggle - show/hide compression type selector
+    const compressToggle = document.getElementById('download-compress') as HTMLInputElement;
+    compressToggle?.addEventListener('change', () => {
+      this.updateCompressionTypeVisibility();
     });
   }
 
@@ -269,6 +279,18 @@ class SettingsManager {
       preview.style.cssText = EFFECT_STYLES[effect];
     } else {
       previewContainer.style.display = 'none';
+    }
+  }
+  
+  /**
+   * Update compression type visibility based on compress toggle
+   */
+  private updateCompressionTypeVisibility(): void {
+    const compressEnabled = (document.getElementById('download-compress') as HTMLInputElement).checked;
+    const compressionTypeContainer = document.getElementById('compression-type-container');
+    
+    if (compressionTypeContainer) {
+      compressionTypeContainer.style.display = compressEnabled ? 'block' : 'none';
     }
   }
 
@@ -382,6 +404,7 @@ class SettingsManager {
         defaultQuality: (document.getElementById('download-quality') as HTMLSelectElement).value,
         downloadChunkSize: parseInt((document.getElementById('download-chunks') as HTMLInputElement).value),
         compressVideo: (document.getElementById('download-compress') as HTMLInputElement).checked,
+        compressionType: (document.getElementById('compression-type') as HTMLSelectElement).value as CompressionType,
         enableNotifications: (document.getElementById('download-notifications') as HTMLInputElement).checked,
         showThumbnails: (document.getElementById('download-thumbnails') as HTMLInputElement).checked,
         maxHistoryItems: parseInt((document.getElementById('history-max') as HTMLInputElement).value),
@@ -467,6 +490,7 @@ class SettingsManager {
         defaultQuality: 'Source',
         downloadChunkSize: 5,
         compressVideo: true,
+        compressionType: 'lossless',
         enableNotifications: true,
         showThumbnails: true,
         maxHistoryItems: 100,

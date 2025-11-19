@@ -37,8 +37,15 @@ export class VodUnlockerFeature extends Feature {
       this.log('Patch URL loaded:', this.patchUrl);
     } else {
       // Si le patch_url n'est pas disponible immédiatement, réessayer de manière non-bloquante
-      this.logError('Patch URL not available immediately, will retry on enable');
-      // On ne bloque pas l'initialisation, on réessayera lors de l'activation
+      this.logError('Patch URL not available immediately - will retry on enable');
+      // Attendre un peu et réessayer
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if ((window as any).patch_url) {
+        this.patchUrl = (window as any).patch_url;
+        this.log('Patch URL loaded after delay:', this.patchUrl);
+      } else {
+        this.logError('CRITICAL: Patch URL still not available after delay - VodUnlocker will not work!');
+      }
     }
   }
 
@@ -51,6 +58,12 @@ export class VodUnlockerFeature extends Feature {
       this.log('Patch URL loaded on enable:', this.patchUrl);
     }
     
+    if (!this.patchUrl) {
+      this.logError('CRITICAL: Cannot enable VodUnlocker - patch URL still not available!');
+      return;
+    }
+
+    this.log('Patching Worker with URL:', this.patchUrl);
     this.patchWorker();
   }
 
@@ -65,20 +78,27 @@ export class VodUnlockerFeature extends Feature {
 
   private patchWorker(): void {
     if (!this.patchUrl) {
-      this.logError('Patch URL not available');
+      this.logError('CRITICAL: patchWorker called but patch URL not available!');
       return;
     }
 
+    this.log('Starting Worker patch with URL:', this.patchUrl);
+
     // Sauvegarder le Worker original
     this.originalWorker = (window as any).Worker;
+    this.log('Original Worker saved');
 
     // Override Worker avec le patch
     try {
       const self = this;
       const patchUrl = this.patchUrl;
       
+      this.log('Creating PatchedWorker class...');
+      
       (window as any).Worker = class PatchedWorker extends self.originalWorker {
         constructor(twitchBlobUrl: string) {
+          console.log('[NSV VodUnlocker] PatchedWorker constructor called with:', twitchBlobUrl);
+          
           // Solution: créer un Worker intermédiaire qui charge le patch puis le code Twitch
           // On utilise importScripts qui est synchrone dans les Workers
           const loaderCode = `
@@ -102,13 +122,15 @@ export class VodUnlockerFeature extends Feature {
           const blob = new Blob([loaderCode], { type: 'application/javascript' });
           const patchedUrl = URL.createObjectURL(blob);
           
+          console.log('[NSV VodUnlocker] Created patched worker blob URL:', patchedUrl);
+          
           super(patchedUrl);
         }
       };
       
-      this.log('Worker patched successfully');
+      this.log('Worker class successfully replaced with PatchedWorker');
     } catch (e) {
-      this.logError('Worker override setup failed', e);
+      this.logError('CRITICAL: Worker override setup failed', e);
     }
   }
 

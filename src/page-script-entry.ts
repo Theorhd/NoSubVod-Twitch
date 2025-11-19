@@ -15,8 +15,10 @@ if (currentScript) {
     (window as any).patch_url = patchUrl;
     console.log('[NSV] Patch URL loaded from script attribute:', patchUrl);
   } else {
-    console.warn('[NSV] No patch URL found in script attribute');
+    console.error('[NSV] ERROR: No patch URL found in script attribute - VodUnlocker will not work!');
   }
+} else {
+  console.error('[NSV] ERROR: document.currentScript is null - VodUnlocker will not work!');
 }
 
 // Initialiser le gestionnaire de features pour le contexte page script
@@ -27,7 +29,12 @@ const manager = new FeatureManager({
 
 // Enregistrer toutes les features du registre (elles seront filtrées par contexte automatiquement)
 const allFeatures = instantiateAllFeatures();
+console.log('[NSV] Registering features for PAGE_SCRIPT context:', allFeatures.length, 'features total');
 manager.registerMany(allFeatures);
+
+// Vérifier combien de features ont été effectivement enregistrées
+const registeredFeatures = manager.getAllFeatures();
+console.log('[NSV] Features registered in PAGE_SCRIPT:', registeredFeatures.map(f => f.getId()).join(', '));
 
 // Initialiser toutes les features
 manager.initializeAll().then(() => {
