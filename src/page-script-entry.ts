@@ -27,7 +27,13 @@ const manager = new FeatureManager({
 
 // Enregistrer toutes les features du registre (elles seront filtrées par contexte automatiquement)
 const allFeatures = instantiateAllFeatures();
+console.log('[NSV] All features from registry:', allFeatures.map(f => ({
+  id: f.getId(),
+  context: f.getConfig().context,
+  urlPatterns: f.getConfig().urlPatterns
+})));
 manager.registerMany(allFeatures);
+console.log('[NSV] Registered features:', manager.getAllFeatures().map(f => f.getId()));
 
 // Initialiser toutes les features
 manager.initializeAll().then(() => {

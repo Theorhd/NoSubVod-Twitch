@@ -75,12 +75,15 @@ const oldFetch = (self as any).fetch;
   }
 
   if (url.startsWith('https://usher.ttvnw.net/vod/')) {
+    console.log('[NSV] Usher VOD request detected - URL:', url);
+    console.log('[NSV] Response status:', response.status);
+    
     if (response.status !== 200) {
       // Extract vodId, removing any version prefix (v2/, v3/, etc.)
       let vodId = url.split('https://usher.ttvnw.net/vod/')[1].split('.m3u8')[0];
       vodId = vodId.replace(/^v\d+\//, ''); // Remove v2/, v3/, etc.
       
-      console.log('[NSV] Fetching VOD data for:', vodId);
+      console.log('[NSV] Non-200 response, patching VOD:', vodId);
       const data = await fetchTwitchDataGQL(vodId);
       console.log('[NSV] GQL response:', JSON.stringify(data));
       
@@ -177,7 +180,10 @@ ${streamUrl}`;
       }
 
       const headers = new Headers({ 'Content-Type': 'application/vnd.apple.mpegurl' });
+      console.log('[NSV] Returning fake playlist with', fakePlaylist.split('\n').length, 'lines');
       return new Response(fakePlaylist, { status: 200, headers });
+    } else {
+      console.log('[NSV] Usher returned 200, using original response');
     }
   }
 

@@ -240,30 +240,26 @@ async function loadSettings(): Promise<void> {
 
   (document.getElementById('settingDefaultQuality') as HTMLSelectElement).value = settings.defaultQuality;
   (document.getElementById('settingDefaultFileFormat') as HTMLSelectElement).value = settings.defaultFileFormat;
-  (document.getElementById('settingChunkSize') as HTMLInputElement).value = settings.downloadChunkSize.toString();
   (document.getElementById('settingNotifications') as HTMLInputElement).checked = settings.enableNotifications;
   (document.getElementById('settingThumbnails') as HTMLInputElement).checked = settings.showThumbnails;
-  (document.getElementById('settingMaxHistory') as HTMLInputElement).value = settings.maxHistoryItems.toString();
-  (document.getElementById('settingAutoCleanup') as HTMLInputElement).value = settings.autoCleanupDays.toString();
 }
 
 async function saveSettings(): Promise<void> {
   const settings: Partial<Settings> = {
     defaultQuality: (document.getElementById('settingDefaultQuality') as HTMLSelectElement).value,
     defaultFileFormat: (document.getElementById('settingDefaultFileFormat') as HTMLSelectElement).value as 'ts' | 'mp4',
-    downloadChunkSize: parseInt((document.getElementById('settingChunkSize') as HTMLInputElement).value),
     enableNotifications: (document.getElementById('settingNotifications') as HTMLInputElement).checked,
-    showThumbnails: (document.getElementById('settingThumbnails') as HTMLInputElement).checked,
-    maxHistoryItems: parseInt((document.getElementById('settingMaxHistory') as HTMLInputElement).value),
-    autoCleanupDays: parseInt((document.getElementById('settingAutoCleanup') as HTMLInputElement).value)
+    showThumbnails: (document.getElementById('settingThumbnails') as HTMLInputElement).checked
   };
 
   await storage.saveSettings(settings);
 
   const successEl = document.getElementById('settingsSuccess')!;
   successEl.textContent = '✅ Paramètres enregistrés !';
+  successEl.classList.add('visible');
   setTimeout(() => {
     successEl.textContent = '';
+    successEl.classList.remove('visible');
   }, 3000);
 }
 
@@ -283,7 +279,9 @@ async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: stri
   const endTimeInput = document.getElementById('endTime') as HTMLInputElement;
 
   error.textContent = '';
+  error.classList.remove('visible');
   success.textContent = '';
+  success.classList.remove('visible');
   status.textContent = 'Démarrage du téléchargement...';
   progressContainer.classList.add('visible');
   btn.disabled = true;
@@ -303,6 +301,7 @@ async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: stri
       (response: any) => {
         if (chrome.runtime.lastError) {
           error.textContent = '❌ Erreur: ' + chrome.runtime.lastError.message;
+          error.classList.add('visible');
           progressContainer.classList.remove('visible');
           btn.disabled = false;
           return;
@@ -313,13 +312,16 @@ async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: stri
             ? `✅ Téléchargement terminé (${response.failedCount} segments omis)`
             : '✅ Téléchargement terminé avec succès !';
           success.textContent = msg;
+          success.classList.add('visible');
 
           setTimeout(() => {
             progressContainer.classList.remove('visible');
             success.textContent = '';
+            success.classList.remove('visible');
           }, 5000);
         } else {
           error.textContent = '❌ Échec: ' + response.error;
+          error.classList.add('visible');
           progressContainer.classList.remove('visible');
         }
         btn.disabled = false;
@@ -329,9 +331,11 @@ async function downloadVod(playlistUrl: string, vodInfo: any, qualityLabel: stri
     // Show message that download continues in background
     status.textContent = '⏳ Téléchargement en cours en arrière-plan...';
     success.textContent = '💡 Vous pouvez fermer ce popup, le téléchargement continuera !';
+    success.classList.add('visible');
   } catch (e: any) {
     console.error('[NoSubVod] Download error:', e);
     error.textContent = '❌ Échec: ' + (e.message || e);
+    error.classList.add('visible');
     progressContainer.classList.remove('visible');
     btn.disabled = false;
   }
@@ -365,6 +369,7 @@ async function init(): Promise<void> {
     progressSize.textContent = formatBytes(progress.downloadedBytes);
     statusEl.textContent = '⏳ Téléchargement en cours...';
     successEl.textContent = '💡 Le téléchargement continue en arrière-plan';
+    successEl.classList.add('visible');
   }
   
   // Listen for download progress updates from background
@@ -401,7 +406,11 @@ async function init(): Promise<void> {
           ? `✅ Téléchargement terminé (${request.failedCount} segments omis)`
           : '✅ Téléchargement terminé avec succès !';
         successEl.textContent = msg;
-        setTimeout(() => { successEl.textContent = ''; }, 5000);
+        successEl.classList.add('visible');
+        setTimeout(() => { 
+          successEl.textContent = ''; 
+          successEl.classList.remove('visible');
+        }, 5000);
       } else {
         errorEl.textContent = '❌ Échec: ' + request.error;
       }
@@ -506,7 +515,11 @@ async function init(): Promise<void> {
         if (response && response.success) {
           progressContainer.classList.remove('visible');
           successEl.textContent = '⚠️ Téléchargement annulé';
-          setTimeout(() => { successEl.textContent = ''; }, 3000);
+          successEl.classList.add('visible');
+          setTimeout(() => { 
+            successEl.textContent = ''; 
+            successEl.classList.remove('visible');
+          }, 3000);
         }
       });
     }
@@ -680,6 +693,7 @@ async function init(): Promise<void> {
       const successEl = document.getElementById('success')!;
       errorEl.textContent = '';
       successEl.textContent = '';
+      successEl.classList.remove('visible');
       
       if (url.endsWith('.m3u8')) {
         const fileFormatSelect = document.getElementById('fileFormat') as HTMLSelectElement;
@@ -688,13 +702,18 @@ async function init(): Promise<void> {
       } else {
         chrome.downloads.download({ url, saveAs: true }, () => {
           successEl.textContent = '✅ Téléchargement lancé !';
-          setTimeout(() => { successEl.textContent = ''; }, 3000);
+          successEl.classList.add('visible');
+          setTimeout(() => { 
+            successEl.textContent = ''; 
+            successEl.classList.remove('visible');
+          }, 3000);
         });
       }
     });
   } catch (e: any) {
     status.textContent = '';
     error.textContent = '❌ Erreur: ' + (e?.message || e);
+    error.classList.add('visible');
   }
 }
 
@@ -852,8 +871,6 @@ function setupChatCustomization() {
 }
 
 init();
-setupBadgeManager();
-setupChatCustomization();
 
 // Display version from manifest
 (() => {

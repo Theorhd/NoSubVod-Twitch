@@ -5,116 +5,517 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>NoSubVod</title>
     <style>
-      * { box-sizing: border-box; }
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 0; width: 420px; color: #e3e3e3; background: #0e0e10; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif; 
+        width: 440px; 
+        color: #e4e4e7; 
+        background: linear-gradient(135deg, #0a0a0f 0%, #18181b 100%);
+        overflow-x: hidden;
+      }
       
-      header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid #2f2f37; }
-      .header-left { display: flex; align-items: center; gap: 8px; }
-      h1 { font-size: 16px; margin: 0; }
+      /* Header moderne avec gradient */
+      header { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        padding: 16px 20px;
+        background: linear-gradient(135deg, rgba(145, 70, 255, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
+        border-bottom: 1px solid rgba(145, 70, 255, 0.2);
+        backdrop-filter: blur(10px);
+      }
+      .header-left { 
+        display: flex; 
+        align-items: center; 
+        gap: 12px; 
+      }
+      .header-left img {
+        width: 32px;
+        height: 32px;
+        filter: drop-shadow(0 0 8px rgba(145, 70, 255, 0.6));
+      }
+      h1 { 
+        font-size: 18px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #a78bfa 0%, #c084fc 50%, #e879f9 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.02em;
+      }
       
-      /* Tabs */
-      .tabs { display: flex; border-bottom: 1px solid #2f2f37; background: #18181b; }
-      .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; border: none; background: none; color: #adadb8; font-size: 13px; font-weight: 600; transition: all 0.2s; }
-      .tab:hover { background: #1f1f23; color: #e3e3e3; }
-      .tab.active { color: #9146FF; border-bottom: 2px solid #9146FF; }
+      /* Tabs modernes avec indicateur fluide */
+      .tabs { 
+        display: flex; 
+        background: rgba(24, 24, 27, 0.6);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(63, 63, 70, 0.3);
+        padding: 0 8px;
+        position: relative;
+      }
+      .tab { 
+        flex: 1; 
+        padding: 14px 8px;
+        text-align: center; 
+        cursor: pointer; 
+        border: none; 
+        background: none; 
+        color: #a1a1aa; 
+        font-size: 13px; 
+        font-weight: 600; 
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        z-index: 1;
+      }
+      .tab:hover { color: #e4e4e7; }
+      .tab.active { 
+        color: #c084fc;
+      }
+      .tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #c084fc, transparent);
+        border-radius: 2px 2px 0 0;
+        box-shadow: 0 0 8px rgba(192, 132, 252, 0.5);
+      }
       
-      /* Tab content */
-      .tab-content { display: none; padding: 12px; max-height: 500px; overflow-y: auto; }
+      /* Tab content avec animations */
+      .tab-content { 
+        display: none; 
+        padding: 16px;
+        max-height: 550px; 
+        overflow-y: auto;
+        animation: fadeIn 0.3s ease;
+      }
       .tab-content.active { display: block; }
       
-      /* Download tab */
-      .vod-info { font-size: 12px; line-height: 1.4; margin-bottom: 10px; color: #cfcfcf; }
-      .thumbnail { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      
+      /* Cards modernes avec glassmorphism */
+      .vod-info { 
+        background: rgba(24, 24, 27, 0.5);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(63, 63, 70, 0.5);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      
+      .thumbnail { 
+        width: 100%; 
+        height: 140px; 
+        object-fit: cover; 
+        border-radius: 12px;
+        margin-bottom: 16px;
+        border: 1px solid rgba(63, 63, 70, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
       .thumbnail.hidden { display: none; }
-      .row { display: flex; justify-content: space-between; gap: 8px; margin: 6px 0; }
-      .label { color: #adadb8; font-weight: 500; }
       
-      /* Progress bar */
-      .progress-container { background: #18181b; border-radius: 8px; padding: 10px; margin: 10px 0; display: none; }
+      .row { 
+        display: flex; 
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px; 
+        margin: 10px 0;
+      }
+      .label { 
+        color: #a1a1aa;
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .row > span:last-child {
+        color: #e4e4e7;
+        font-weight: 500;
+      }
+      
+      /* Progress bar moderne */
+      .progress-container { 
+        background: rgba(24, 24, 27, 0.6);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(145, 70, 255, 0.2);
+        border-radius: 12px;
+        padding: 16px;
+        margin: 16px 0;
+        display: none;
+      }
       .progress-container.visible { display: block; }
-      .progress-bar { width: 100%; height: 8px; background: #2f2f37; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
-      .progress-fill { height: 100%; background: linear-gradient(90deg, #9146FF, #b366ff); transition: width 0.3s; }
-      .progress-stats { font-size: 11px; color: #adadb8; display: flex; justify-content: space-between; }
-      .progress-percent { font-weight: 600; color: #9146FF; }
       
-      /* Buttons */
-      button { width: 100%; padding: 8px 10px; background: #9146FF; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: background 0.2s; }
-      button:hover { background: #a45fff; }
-      button[disabled] { opacity: 0.6; cursor: default; background: #9146FF; }
-      button.secondary { background: #2f2f37; }
-      button.secondary:hover { background: #3a3a42; }
+      .progress-bar { 
+        width: 100%; 
+        height: 6px;
+        background: rgba(39, 39, 42, 0.8);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 12px;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      .progress-fill { 
+        height: 100%;
+        background: linear-gradient(90deg, #a78bfa, #c084fc, #e879f9);
+        transition: width 0.3s ease;
+        border-radius: 3px;
+        position: relative;
+        overflow: hidden;
+      }
+      .progress-fill::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        animation: shimmer 2s infinite;
+      }
+      @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
       
-      /* Input fields */
-      select, input[type="text"], input[type="number"] { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #2f2f37; background: #18181b; color: #e3e3e3; font-size: 13px; }
-      select:focus, input:focus { outline: none; border-color: #9146FF; }
+      .progress-stats { 
+        font-size: 12px;
+        color: #a1a1aa;
+        display: flex; 
+        justify-content: space-between;
+        margin-top: 8px;
+      }
+      .progress-percent { 
+        font-weight: 700;
+        color: #c084fc;
+        font-size: 14px;
+      }
+      
+      /* Boutons modernes avec effets */
+      button { 
+        width: 100%;
+        padding: 12px 16px;
+        background: linear-gradient(135deg, #a78bfa 0%, #c084fc 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 12px rgba(145, 70, 255, 0.3);
+        position: relative;
+        overflow: hidden;
+      }
+      button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(145, 70, 255, 0.4);
+      }
+      button:hover::before { opacity: 1; }
+      button:active { transform: translateY(0); }
+      button[disabled] { 
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none;
+      }
+      button.secondary { 
+        background: rgba(63, 63, 70, 0.6);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      }
+      button.secondary:hover { 
+        background: rgba(82, 82, 91, 0.7);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+      
+      /* Input fields modernes */
+      select, input[type="text"], input[type="number"] { 
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(63, 63, 70, 0.5);
+        background: rgba(24, 24, 27, 0.6);
+        backdrop-filter: blur(10px);
+        color: #e4e4e7;
+        font-size: 13px;
+        transition: all 0.3s;
+      }
+      select:focus, input:focus { 
+        outline: none;
+        border-color: #c084fc;
+        box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.1);
+        background: rgba(24, 24, 27, 0.8);
+      }
       
       /* Messages */
-      .error { color: #ff8484; font-size: 12px; margin-top: 8px; }
-      .success { color: #4caf50; font-size: 12px; margin-top: 8px; }
-      .muted { color: #adadb8; font-size: 13px; }
+      .error { 
+        color: #fca5a5;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        margin-top: 12px;
+        display: none;
+      }
+      .error.visible { display: block; }
+      .success { 
+        color: #86efac;
+        background: rgba(34, 197, 94, 0.1);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        margin-top: 12px;
+        display: none;
+      }
+      .success.visible { display: block; }
+      .muted { 
+        color: #71717a;
+        font-size: 13px;
+      }
       
-      /* History */
-      .history-item { background: #18181b; border-radius: 8px; padding: 10px; margin-bottom: 8px; cursor: pointer; transition: background 0.2s; }
-      .history-item:hover { background: #1f1f23; }
-      .history-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-      .history-thumb { width: 60px; height: 34px; object-fit: cover; border-radius: 4px; }
+      /* History moderne */
+      .history-item { 
+        background: rgba(24, 24, 27, 0.5);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(63, 63, 70, 0.3);
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 12px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .history-item:hover { 
+        background: rgba(39, 39, 42, 0.6);
+        border-color: rgba(145, 70, 255, 0.4);
+        transform: translateX(4px);
+      }
+      .history-header { 
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .history-thumb { 
+        width: 72px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid rgba(63, 63, 70, 0.5);
+      }
       .history-info { flex: 1; }
-      .history-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .history-meta { font-size: 11px; color: #adadb8; }
-      .history-empty { text-align: center; padding: 40px 20px; color: #adadb8; }
-      .clear-history { margin-top: 10px; }
+      .history-title { 
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #e4e4e7;
+      }
+      .history-meta { 
+        font-size: 11px;
+        color: #a1a1aa;
+      }
+      .history-empty { 
+        text-align: center;
+        padding: 48px 20px;
+        color: #71717a;
+      }
+      .history-empty p:first-child {
+        font-size: 48px;
+        margin-bottom: 12px;
+        opacity: 0.5;
+      }
+      .clear-history { margin-top: 12px; }
       
-      /* Settings */
-      .setting-group { margin-bottom: 20px; }
-      .setting-group h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #adadb8; text-transform: uppercase; }
-      .setting-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-      .setting-label { font-size: 13px; }
-      .setting-desc { font-size: 11px; color: #adadb8; margin-top: 2px; }
+      /* Settings modernes */
+      .setting-group { margin-bottom: 24px; }
+      .setting-group h3 { 
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #a1a1aa;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .setting-item { 
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(24, 24, 27, 0.4);
+        padding: 14px;
+        margin-bottom: 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(63, 63, 70, 0.3);
+        transition: all 0.3s;
+      }
+      .setting-item:hover {
+        background: rgba(39, 39, 42, 0.5);
+        border-color: rgba(145, 70, 255, 0.3);
+      }
+      .setting-label { 
+        font-size: 13px;
+        font-weight: 500;
+        color: #e4e4e7;
+      }
+      .setting-desc { 
+        font-size: 11px;
+        color: #a1a1aa;
+        margin-top: 4px;
+      }
       
-      /* Toggle switch */
-      .toggle { position: relative; width: 44px; height: 24px; }
-      .toggle input { opacity: 0; width: 0; height: 0; }
-      .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #2f2f37; border-radius: 24px; transition: 0.3s; }
-      .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
-      .toggle input:checked + .toggle-slider { background: #9146FF; }
-      .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
+      /* Toggle switch moderne */
+      .toggle { 
+        position: relative;
+        width: 48px;
+        height: 26px;
+      }
+      .toggle input { 
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .toggle-slider { 
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(63, 63, 70, 0.8);
+        border-radius: 26px;
+        transition: 0.3s;
+        border: 1px solid rgba(63, 63, 70, 0.5);
+      }
+      .toggle-slider:before { 
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 2px;
+        bottom: 2px;
+        background: white;
+        border-radius: 50%;
+        transition: 0.3s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      .toggle input:checked + .toggle-slider { 
+        background: linear-gradient(135deg, #a78bfa, #c084fc);
+        border-color: transparent;
+      }
+      .toggle input:checked + .toggle-slider:before { 
+        transform: translateX(22px);
+      }
       
-      /* Scrollbar */
+      /* Scrollbar moderne */
       ::-webkit-scrollbar { width: 8px; }
-      ::-webkit-scrollbar-track { background: #18181b; }
-      ::-webkit-scrollbar-thumb { background: #2f2f37; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
+      ::-webkit-scrollbar-track { 
+        background: rgba(24, 24, 27, 0.5);
+      }
+      ::-webkit-scrollbar-thumb { 
+        background: rgba(145, 70, 255, 0.3);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover { 
+        background: rgba(145, 70, 255, 0.5);
+      }
       
-      /* Badge styles */
+      /* Badge styles modernes */
       .badge-btn { 
-        width: 100%; 
-        padding: 10px; 
-        background: #2f2f37; 
-        border: 2px solid transparent; 
-        border-radius: 6px; 
-        cursor: pointer; 
-        font-size: 20px; 
-        transition: all 0.2s; 
+        width: 100%;
+        padding: 12px;
+        background: rgba(24, 24, 27, 0.6);
+        border: 2px solid rgba(63, 63, 70, 0.5);
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 20px;
+        transition: all 0.3s;
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 50px;
+        min-height: 56px;
       }
-      .badge-btn:hover { background: #3a3a42; border-color: #9146FF; }
-      .badge-btn.selected { border-color: #9146FF; background: #1a1f2e; }
-      .badge-btn img { max-width: 100%; max-height: 40px; object-fit: contain; }
+      .badge-btn:hover { 
+        background: rgba(39, 39, 42, 0.7);
+        border-color: #c084fc;
+        transform: scale(1.05);
+      }
+      .badge-btn.selected { 
+        border-color: #c084fc;
+        background: rgba(145, 70, 255, 0.15);
+        box-shadow: 0 0 20px rgba(145, 70, 255, 0.3);
+      }
+      .badge-btn img { 
+        max-width: 100%;
+        max-height: 40px;
+        object-fit: contain;
+      }
+      
+      /* Settings icon button */
+      .settings-btn {
+        background: rgba(145, 70, 255, 0.1);
+        border: 1px solid rgba(145, 70, 255, 0.3);
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      .settings-btn:hover {
+        background: rgba(145, 70, 255, 0.2);
+        border-color: rgba(145, 70, 255, 0.5);
+      }
+      .settings-btn .icon {
+        display: inline-block;
+        transition: transform 0.3s;
+      }
+      .settings-btn:hover .icon {
+        transform: rotate(90deg);
+      }
+      
+      /* Version badge */
+      #version {
+        background: rgba(145, 70, 255, 0.1);
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #c084fc;
+        border: 1px solid rgba(145, 70, 255, 0.2);
+      }
     </style>
   </head>
   <body>
     <header>
       <div class="header-left">
-        <img src="../../assets/icons/icon.png" alt="icon" width="20" height="20">
-        <h1>NoSubVod Twitch</h1>
+        <img src="../../assets/icons/icon.png" alt="icon">
+        <h1>NoSubVod</h1>
       </div>
-      <button id="openSettings" style="background: none; border: none; cursor: pointer; padding: 8px; border-radius: 6px; transition: background 0.2s;" title="Ouvrir les paramètres">
-        <span style="font-size: 20px;">⚙️</span>
-      </button>
-      <span id="version" class="muted" style="font-size: 11px;">v—</span>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span id="version"></span>
+        <button id="openSettings" class="settings-btn" title="Paramètres avancés">
+          <span class="icon" style="font-size: 18px;">⚙️</span>
+        </button>
+      </div>
     </header>
     
     <div class="tabs">
@@ -173,8 +574,8 @@
         <div class="row">
           <button id="downloadDirect" class="secondary">Télécharger la vidéo</button>
         </div>
-        <div class="error" id="error"></div>
-        <div class="success" id="success"></div>
+        <div class="error" id="error" style="display: none;"></div>
+        <div class="success" id="success" style="display: none;"></div>
       </div>
     </div>
     
@@ -192,13 +593,14 @@
     <!-- Settings Tab -->
     <div class="tab-content" id="settings-tab">
       <div class="setting-group">
-        <h3>🎬 Téléchargement</h3>
+        <h3>⚡ Paramètres Rapides</h3>
+        
         <div class="setting-item">
           <div>
             <div class="setting-label">Qualité par défaut</div>
-            <div class="setting-desc">Qualité présélectionnée</div>
+            <div class="setting-desc">Qualité présélectionnée pour les téléchargements</div>
           </div>
-          <select id="settingDefaultQuality" style="width: 120px;">
+          <select id="settingDefaultQuality" style="width: 130px;">
             <option value="Source">Source</option>
             <option value="1080p60">1080p60</option>
             <option value="720p60">720p60</option>
@@ -206,44 +608,32 @@
             <option value="360p30">360p30</option>
           </select>
         </div>
+        
         <div class="setting-item">
           <div>
             <div class="setting-label">Format par défaut</div>
-            <div class="setting-desc">Format de fichier présélectionné</div>
+            <div class="setting-desc">Format de fichier pour les téléchargements</div>
           </div>
-          <select id="settingDefaultFileFormat" style="width: 120px;">
-            <option value="ts">TS (MPEG-TS)</option>
+          <select id="settingDefaultFileFormat" style="width: 130px;">
             <option value="mp4">MP4</option>
+            <option value="ts">TS (MPEG-TS)</option>
           </select>
         </div>
+        
         <div class="setting-item">
           <div>
-            <div class="setting-label">Segments parallèles</div>
-            <div class="setting-desc">Nombre de segments téléchargés simultanément</div>
-          </div>
-          <input id="settingChunkSize" type="number" min="1" max="10" value="5" style="width: 60px;">
-        </div>
-      </div>
-      
-      <div class="setting-group">
-        <h3>🔔 Notifications</h3>
-        <div class="setting-item">
-          <div>
-            <div class="setting-label">Activer les notifications</div>
-            <div class="setting-desc">Recevoir une notification à la fin du téléchargement</div>
+            <div class="setting-label">Notifications</div>
+            <div class="setting-desc">Alertes de fin de téléchargement</div>
           </div>
           <label class="toggle">
             <input type="checkbox" id="settingNotifications" checked>
             <span class="toggle-slider"></span>
           </label>
         </div>
-      </div>
-      
-      <div class="setting-group">
-        <h3>🖼️ Interface</h3>
+        
         <div class="setting-item">
           <div>
-            <div class="setting-label">Afficher les miniatures</div>
+            <div class="setting-label">Miniatures</div>
             <div class="setting-desc">Afficher les thumbnails des VODs</div>
           </div>
           <label class="toggle">
@@ -252,99 +642,21 @@
           </label>
         </div>
       </div>
-
-      <div class="setting-group">
-        <h3>💬 Personnalisation du Pseudo</h3>
-        
-        <!-- Badge Selection -->
-        <div class="setting-item">
-          <div>
-            <div class="setting-label">Sélectionner un Badge</div>
-            <div class="setting-desc">Choisir parmi les badges prédéfinis ou vos imports</div>
-          </div>
-        </div>
-        
-        <!-- Predefined Badges -->
-        <div style="margin-bottom: 12px;">
-          <div class="setting-desc" style="margin-bottom: 8px;">📌 Badges Prédéfinis</div>
-          <div id="badgePresets" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;">
-            <!-- Badges prédéfinis seront ajoutés ici par JS -->
-          </div>
-        </div>
-        
-        <!-- Imported Badges -->
-        <div style="margin-bottom: 12px;">
-          <div class="setting-desc" style="margin-bottom: 8px;">🎨 Vos Badges Importés</div>
-          <div id="badgeImported" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px;">
-            <!-- Badges importés seront ajoutés ici par JS -->
-          </div>
-          <button id="badgeImportBtn" class="secondary" style="margin-bottom: 12px;">➕ Importer un Badge</button>
-          <input type="file" id="badgeFileInput" accept="image/*" style="display: none;">
-        </div>
-        
-        <!-- Custom Badge Text -->
-        <div class="setting-item">
-          <div>
-            <div class="setting-label">Badge Personnalisé</div>
-            <div class="setting-desc">Ou entrez du texte/emoji personnalisé</div>
-          </div>
-        </div>
-        <input id="chatMyBadge" type="text" placeholder="Ex: 👑 ou [VIP]" style="margin-bottom: 6px;">
-        
-        <!-- Badge Name/Tooltip -->
-        <div class="setting-item">
-          <div>
-            <div class="setting-label">Nom du Badge (Tooltip)</div>
-            <div class="setting-desc">Nom qui s'affichera au survol du badge</div>
-          </div>
-        </div>
-        <input id="chatBadgeName" type="text" placeholder="Ex: ZEVENT 2024" style="margin-bottom: 12px;">
-        
-        <!-- Effect Selection -->
-        <div class="setting-item">
-          <div>
-            <div class="setting-label">Effet de Mon Pseudo</div>
-            <div class="setting-desc">Effet visuel appliqué à votre pseudo dans le chat</div>
-          </div>
-        </div>
-        <select id="chatMyEffect" style="margin-bottom: 12px;">
-          <option value="">Aucun effet</option>
-          <option value="rainbow">🌈 Arc-en-ciel</option>
-          <option value="gradient_purple">💜 Dégradé Violet</option>
-          <option value="gradient_ocean">💙 Dégradé Océan</option>
-          <option value="gradient_fire">🔥 Dégradé Feu</option>
-          <option value="gradient_sunset">🌅 Dégradé Coucher de Soleil</option>
-          <option value="glitch">⚡ Glitch</option>
-          <option value="neon_blue">💎 Néon Bleu</option>
-          <option value="neon_pink">💖 Néon Rose</option>
-        </select>
-        
-        <button id="chatApplyCustomization">✨ Appliquer la personnalisation</button>
-        <div class="success" id="chatCustomizationSuccess"></div>
-      </div>
       
-      <div class="setting-group">
-        <h3>🗂️ Historique</h3>
-        <div class="setting-item">
-          <div>
-            <div class="setting-label">Nombre max d'éléments</div>
-            <div class="setting-desc">Limite de l'historique</div>
-          </div>
-          <input id="settingMaxHistory" type="number" min="10" max="500" value="100" style="width: 60px;">
+      <div style="padding: 16px; background: rgba(145, 70, 255, 0.1); border-radius: 10px; border: 1px solid rgba(145, 70, 255, 0.2); margin-bottom: 16px;">
+        <div style="font-size: 13px; color: #c084fc; margin-bottom: 8px; font-weight: 600;">⚙️ Plus d'options</div>
+        <div style="font-size: 12px; color: #a1a1aa; margin-bottom: 12px;">
+          Accédez aux paramètres avancés pour personnaliser davantage l'extension
         </div>
-        <div class="setting-item">
-          <div>
-            <div class="setting-label">Nettoyage auto (jours)</div>
-            <div class="setting-desc">Supprimer après X jours (0 = désactivé)</div>
-          </div>
-          <input id="settingAutoCleanup" type="number" min="0" max="365" value="30" style="width: 60px;">
-        </div>
+        <button id="openSettings" style="background: linear-gradient(135deg, #a78bfa 0%, #c084fc 100%);">
+          Ouvrir les Paramètres Complets
+        </button>
       </div>
       
       <div class="row">
-        <button id="saveSettings">💾 Enregistrer les paramètres</button>
+        <button id="saveSettings">💾 Enregistrer</button>
       </div>
-      <div class="success" id="settingsSuccess"></div>
+      <div class="success" id="settingsSuccess" style="display: none;"></div>
     </div>
     
     <script src="popup.js"></script>
