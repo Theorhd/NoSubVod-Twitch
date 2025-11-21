@@ -72,23 +72,38 @@ export class VodUnlockerFeature extends Feature {
     // Sauvegarder le Worker original
     this.originalWorker = (window as any).Worker;
 
+    // Fetch le code du patch de manière synchrone pour l'injecter directement
+    // Ceci contourne les restrictions de Brave sur importScripts() avec chrome-extension://
+    let patchCode = '';
+    
+    // Utiliser XMLHttpRequest synchrone pour charger le patch (fonctionne sur Brave)
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', this.patchUrl, false); // false = synchrone
+      xhr.send();
+      if (xhr.status === 200) {
+        patchCode = xhr.responseText;
+        this.log('Patch code fetched successfully, length:', patchCode.length);
+      } else {
+        this.logError('Failed to fetch patch code, status:', xhr.status);
+        return;
+      }
+    } catch (e) {
+      this.logError('Failed to fetch patch code:', e);
+      return;
+    }
+
     // Override Worker avec le patch
     try {
       const self = this;
-      const patchUrl = this.patchUrl;
       
       (window as any).Worker = class PatchedWorker extends self.originalWorker {
         constructor(twitchBlobUrl: string) {
-          // Solution: créer un Worker intermédiaire qui charge le patch puis le code Twitch
-          // On utilise importScripts qui est synchrone dans les Workers
+          // Injecter directement le code du patch au lieu d'utiliser importScripts
+          // Ceci fonctionne sur Brave car on ne fait pas de cross-origin importScripts
           const loaderCode = `
-            // D'abord charger le patch
-            try {
-              importScripts('${patchUrl}');
-              console.log('[NSV] Patch loaded in worker');
-            } catch (err) {
-              console.error('[NSV] Failed to load patch:', err);
-            }
+            // Code du patch injecté directement
+            ${patchCode}
             
             // Ensuite charger le code Twitch original
             try {
