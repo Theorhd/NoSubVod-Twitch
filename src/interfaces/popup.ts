@@ -900,6 +900,7 @@ async function setupSkinChanger(): Promise<void> {
     text: document.getElementById('colorText') as HTMLInputElement,
     link: document.getElementById('colorLink') as HTMLInputElement,
     button: document.getElementById('colorButton') as HTMLInputElement,
+    playerControls: document.getElementById('colorPlayerControls') as HTMLInputElement,
   };
   
   // Text inputs
@@ -910,6 +911,7 @@ async function setupSkinChanger(): Promise<void> {
     text: document.getElementById('colorTextText') as HTMLInputElement,
     link: document.getElementById('colorLinkText') as HTMLInputElement,
     button: document.getElementById('colorButtonText') as HTMLInputElement,
+    playerControls: document.getElementById('colorPlayerControlsText') as HTMLInputElement,
   };
   
   // Preset buttons
@@ -926,7 +928,8 @@ async function setupSkinChanger(): Promise<void> {
     background: '#0e0e10',
     text: '#e8e8e8',
     link: '#8b9dc3',
-    button: '#4a5568'
+    button: '#4a5568',
+    playerControls: '#9147ff'
   };
   
   skinEnabled.checked = result.twitchSkinEnabled || false;
@@ -968,6 +971,7 @@ async function setupSkinChanger(): Promise<void> {
       text: colorInputs.text.value,
       link: colorInputs.link.value,
       button: colorInputs.button.value,
+      playerControls: textInputs.playerControls.value,
     };
     
     try {
@@ -1013,7 +1017,8 @@ async function setupSkinChanger(): Promise<void> {
       background: '#0e0e10',
       text: '#e8e8e8',
       link: '#8b9dc3',
-      button: '#4a5568'
+      button: '#4a5568',
+      playerControls: '#9147ff'
     };
     
     Object.keys(colorInputs).forEach((key) => {
@@ -1039,7 +1044,8 @@ async function setupSkinChanger(): Promise<void> {
       background: '#0e0e10',
       text: '#e8e8e8',
       link: '#8b9dc3',
-      button: '#4a5568'
+      button: '#4a5568',
+      playerControls: '#8b9dc3'
     });
   });
   
@@ -1050,7 +1056,8 @@ async function setupSkinChanger(): Promise<void> {
       background: '#0f0d1a',
       text: '#dbd8e3',
       link: '#9b87c7',
-      button: '#7e6ba8'
+      button: '#7e6ba8',
+      playerControls: '#9b87c7'
     });
   });
   
@@ -1061,7 +1068,8 @@ async function setupSkinChanger(): Promise<void> {
       background: '#0d1520',
       text: '#d4dce6',
       link: '#7ba3c7',
-      button: '#5a7fa3'
+      button: '#5a7fa3',
+      playerControls: '#7ba3c7'
     });
   });
   
@@ -1072,7 +1080,8 @@ async function setupSkinChanger(): Promise<void> {
       background: '#0f1913',
       text: '#d8e3dd',
       link: '#7fb69e',
-      button: '#5a9178'
+      button: '#5a9178',
+      playerControls: '#7fb69e'
     });
   });
   

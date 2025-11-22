@@ -20,6 +20,8 @@ export interface SkinColors {
   link: string;
   /** Couleur des boutons */
   button: string;
+  /** Couleur de la barre de contrôle du player */
+  playerControls: string;
 }
 
 export class TwitchSkinChanger extends Feature {
@@ -127,23 +129,49 @@ export class TwitchSkinChanger extends Feature {
       
       /* ===== PRIORITÉ ABSOLUE : PLAYER TOUJOURS TRANSPARENT ===== */
       .video-player,
-      .video-player *,
       .video-player__container,
-      .video-player__container *,
       .video-player__overlay,
-      .video-player__overlay *,
       [data-a-player-type],
-      [data-a-player-type] *,
       .persistent-player,
-      .persistent-player *,
       .video-ref,
       video,
       [data-a-target="video-player"],
-      [data-a-target="video-player"] *,
       .player-overlay-background,
-      .content-overlay-gate--video-player {
+      .content-overlay-gate--video-player,
+      .video-player *:not(.seekbar-interaction-area):not([class*="SeekBar"]):not([class*="seekbar"]):not([role="slider"]),
+      .player-controls,
+      .player-controls__left-control-group,
+      .player-controls__right-control-group,
+      [data-a-target="player-controls"],
+      [class*="player-button"],
+      [class*="PlayerControls"] {
         background-color: transparent !important;
         background: transparent !important;
+      }
+      
+      /* Barre de progression (seekbar segment) - COULEUR PERSONNALISÉE */
+      [data-test-selector="seekbar-segment__segment"],
+      .seekbar-segment,
+      [class*="seekbar-segment"] {
+        background-color: ${colors.playerControls} !important;
+      }
+      
+      /* Autres éléments de la seekbar si besoin */
+      .tw-range__track-fill,
+      [class*="SeekBarFill"],
+      .player-seekbar__value {
+        background-color: ${colors.playerControls} !important;
+      }
+      
+      /* Boutons de contrôle du player - garder visibles */
+      .player-controls button,
+      [data-a-target="player-play-pause-button"],
+      [data-a-target="player-volume-button"],
+      [data-a-target="player-settings-button"],
+      [data-a-target="player-fullscreen-button"],
+      [data-a-target="player-theatre-mode-button"] {
+        opacity: 1 !important;
+        visibility: visible !important;
       }
       
       /* Sidebar & Navigation */
@@ -303,7 +331,8 @@ export class TwitchSkinChanger extends Feature {
       background: '#0e0e10',
       text: '#e8e8e8',
       link: '#8b9dc3',
-      button: '#4a5568'
+      button: '#4a5568',
+      playerControls: '#9147ff'
     };
     
     await this.updateColors(defaultColors);
