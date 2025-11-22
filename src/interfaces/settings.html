@@ -626,14 +626,46 @@
           <label class="input-label">Effet du Pseudo</label>
           <select id="chat-effect-select">
             <option value="">Aucun effet</option>
-            <option value="rainbow">🌈 Arc-en-ciel</option>
-            <option value="gradient_purple">💜 Dégradé Violet</option>
-            <option value="gradient_ocean">💙 Dégradé Océan</option>
-            <option value="gradient_fire">🔥 Dégradé Feu</option>
-            <option value="gradient_sunset">🌅 Dégradé Coucher de Soleil</option>
-            <option value="glitch">⚡ Glitch</option>
-            <option value="neon_blue">💎 Néon Bleu</option>
-            <option value="neon_pink">💖 Néon Rose</option>
+            <optgroup label="🌈 Effets Rainbow">
+              <option value="rainbow">Arc-en-ciel Classique</option>
+              <option value="rainbow_wave">Arc-en-ciel Vague</option>
+            </optgroup>
+            <optgroup label="💜 Effets Violets">
+              <option value="gradient_purple">Dégradé Violet</option>
+              <option value="purple_glow">Lueur Violette</option>
+              <option value="purple_pulse">Pulsation Violette</option>
+            </optgroup>
+            <optgroup label="💙 Effets Bleus/Océan">
+              <option value="gradient_ocean">Dégradé Océan</option>
+              <option value="ocean_wave">Vague Océanique</option>
+              <option value="ice_blue">Bleu Glacé</option>
+            </optgroup>
+            <optgroup label="🔥 Effets Feu/Lave">
+              <option value="gradient_fire">Dégradé Feu</option>
+              <option value="fire_flicker">Flamme Scintillante</option>
+              <option value="lava">Lave en Fusion</option>
+            </optgroup>
+            <optgroup label="🌅 Effets Dorés/Sunset">
+              <option value="gradient_sunset">Dégradé Coucher de Soleil</option>
+              <option value="golden">Or Brillant</option>
+            </optgroup>
+            <optgroup label="✨ Effets Néon">
+              <option value="neon_blue">Néon Bleu</option>
+              <option value="neon_pink">Néon Rose</option>
+              <option value="neon_green">Néon Vert</option>
+              <option value="neon_pulse">Pulsation Néon</option>
+            </optgroup>
+            <optgroup label="⚡ Effets Glitch">
+              <option value="glitch">Glitch</option>
+              <option value="glitch_intense">Glitch Intense</option>
+            </optgroup>
+            <optgroup label="🎮 Effets Spéciaux">
+              <option value="cyberpunk">Cyberpunk</option>
+              <option value="matrix">Matrix</option>
+              <option value="hologram">Hologramme</option>
+              <option value="shimmer">Scintillement</option>
+              <option value="toxic">Toxique</option>
+            </optgroup>
           </select>
           <div id="effect-preview-container" style="display: none;">
             <span class="effect-preview" id="effect-preview">VotrePseudo</span>
