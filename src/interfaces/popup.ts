@@ -1085,6 +1085,19 @@ async function setupSkinChanger(): Promise<void> {
     });
   });
   
+  const presetNoSubVod = document.getElementById('presetNoSubVod') as HTMLButtonElement;
+  presetNoSubVod.addEventListener('click', () => {
+    applyPreset({
+      primary: '#1a2921',
+      secondary: '#2d3e35',
+      background: '#141f19',
+      text: '#d6aecb',
+      link: '#ff8080',
+      button: '#0a290f',
+      playerControls: '#287638'
+    });
+  });
+  
   function applyPreset(colors: SkinColors): void {
     Object.keys(colorInputs).forEach((key) => {
       const colorKey = key as keyof SkinColors;
