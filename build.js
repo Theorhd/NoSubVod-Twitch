@@ -25,6 +25,7 @@ const files = [
   { in: 'src/page-script-entry.ts', out: 'dist/page-script-entry.js' },
   { in: 'src/inject-unified.ts', out: 'dist/inject-unified.js' },
   { in: 'src/services/patch_amazonworker.ts', out: 'dist/patch_amazonworker.js' },
+  { in: 'src/services/worker-patch-bootstrap.ts', out: 'dist/worker-patch-bootstrap.js' },
   { in: 'src/utils/feature-test-helper.ts', out: 'dist/feature-test-helper.js' },
   { in: 'src/interfaces/popup.ts', out: 'dist/popup.js' },
   { in: 'src/interfaces/settings.ts', out: 'dist/settings.js' },

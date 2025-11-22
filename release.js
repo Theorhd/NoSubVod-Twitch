@@ -40,6 +40,7 @@ const filesToCopy = [
   { from: 'dist/inject-unified.js', to: 'release/dist/inject-unified.js' },
   { from: 'dist/page-script-entry.js', to: 'release/dist/page-script-entry.js' },
   { from: 'dist/patch_amazonworker.js', to: 'release/dist/patch_amazonworker.js' },
+  { from: 'dist/worker-patch-bootstrap.js', to: 'release/dist/worker-patch-bootstrap.js' },
   { from: 'dist/popup.js', to: 'release/dist/popup.js' },
   { from: 'dist/popup.html', to: 'release/dist/popup.html' },
   { from: 'dist/settings.js', to: 'release/dist/settings.js' },

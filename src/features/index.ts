@@ -8,3 +8,4 @@ export * from './InterfaceChangerFeature';
 export * from './ChatCustomizerFeature';
 export * from './RestrictionRemoverFeature';
 export * from './AdBlockerFeature';
+export * from './TwitchSkinChanger';

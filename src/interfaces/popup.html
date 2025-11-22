@@ -471,6 +471,53 @@
         object-fit: contain;
       }
       
+      /* Color Picker Styles */
+      .color-picker-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .color-picker-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .color-input-group {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      input[type="color"] {
+        width: 56px;
+        height: 40px;
+        border-radius: 8px;
+        border: 2px solid rgba(63, 63, 70, 0.5);
+        background: rgba(24, 24, 27, 0.6);
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      input[type="color"]:hover {
+        border-color: #c084fc;
+        transform: scale(1.05);
+      }
+      .color-text-input {
+        flex: 1;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(63, 63, 70, 0.5);
+        background: rgba(24, 24, 27, 0.6);
+        color: #e4e4e7;
+        font-size: 12px;
+        font-family: monospace;
+        transition: all 0.3s;
+      }
+      .color-text-input:focus {
+        outline: none;
+        border-color: #c084fc;
+        background: rgba(24, 24, 27, 0.8);
+      }
+      
       /* Settings icon button */
       .settings-btn {
         background: rgba(145, 70, 255, 0.1);
@@ -521,6 +568,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="download">Télécharger</button>
       <button class="tab" data-tab="history">Historique</button>
+      <button class="tab" data-tab="skin">Thème</button>
       <button class="tab" data-tab="settings">Paramètres</button>
     </div>
     
@@ -588,6 +636,110 @@
         </div>
       </div>
       <button id="clearHistory" class="clear-history secondary" style="display: none;">Effacer l'historique</button>
+    </div>
+    
+    <!-- Skin Changer Tab -->
+    <div class="tab-content" id="skin-tab">
+      <div class="setting-group">
+        <h3>🎨 Personnalisation de l'Interface</h3>
+        <p class="muted" style="margin-bottom: 16px; font-size: 12px;">
+          Personnalisez les couleurs de l'interface Twitch selon vos préférences
+        </p>
+        
+        <div class="setting-item">
+          <label class="toggle">
+            <input type="checkbox" id="skinEnabled">
+            <span class="toggle-slider"></span>
+          </label>
+          <div>
+            <div class="setting-label">Activer le thème personnalisé</div>
+            <div class="setting-desc">Appliquer vos couleurs personnalisées sur Twitch</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="setting-group">
+        <h3>🎨 Palette de Couleurs</h3>
+        
+        <div class="color-picker-row">
+          <div class="color-picker-item">
+            <label class="setting-label">Couleur Principale</label>
+            <div class="color-input-group">
+              <input type="color" id="colorPrimary" value="#18181b">
+              <input type="text" id="colorPrimaryText" value="#18181b" class="color-text-input">
+            </div>
+            <div class="setting-desc">Sidebar, navigation</div>
+          </div>
+          
+          <div class="color-picker-item">
+            <label class="setting-label">Couleur Secondaire</label>
+            <div class="color-input-group">
+              <input type="color" id="colorSecondary" value="#9147ff">
+              <input type="text" id="colorSecondaryText" value="#9147ff" class="color-text-input">
+            </div>
+            <div class="setting-desc">Hover, accent</div>
+          </div>
+        </div>
+        
+        <div class="color-picker-row">
+          <div class="color-picker-item">
+            <label class="setting-label">Arrière-plan</label>
+            <div class="color-input-group">
+              <input type="color" id="colorBackground" value="#0e0e10">
+              <input type="text" id="colorBackgroundText" value="#0e0e10" class="color-text-input">
+            </div>
+            <div class="setting-desc">Fond principal</div>
+          </div>
+          
+          <div class="color-picker-item">
+            <label class="setting-label">Texte</label>
+            <div class="color-input-group">
+              <input type="color" id="colorText" value="#efeff1">
+              <input type="text" id="colorTextText" value="#efeff1" class="color-text-input">
+            </div>
+            <div class="setting-desc">Couleur du texte</div>
+          </div>
+        </div>
+        
+        <div class="color-picker-row">
+          <div class="color-picker-item">
+            <label class="setting-label">Liens</label>
+            <div class="color-input-group">
+              <input type="color" id="colorLink" value="#bf94ff">
+              <input type="text" id="colorLinkText" value="#bf94ff" class="color-text-input">
+            </div>
+            <div class="setting-desc">Hyperliens</div>
+          </div>
+          
+          <div class="color-picker-item">
+            <label class="setting-label">Boutons</label>
+            <div class="color-input-group">
+              <input type="color" id="colorButton" value="#9147ff">
+              <input type="text" id="colorButtonText" value="#9147ff" class="color-text-input">
+            </div>
+            <div class="setting-desc">Boutons d'action</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="setting-group">
+        <h3>🎭 Préréglages</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+          <button id="presetDark" class="secondary">🌑 Sombre</button>
+          <button id="presetPurple" class="secondary">💜 Violet</button>
+          <button id="presetBlue" class="secondary">💙 Bleu</button>
+          <button id="presetGreen" class="secondary">💚 Vert</button>
+        </div>
+      </div>
+      
+      <div class="row">
+        <button id="applySkin">✨ Appliquer le Thème</button>
+      </div>
+      <div class="row">
+        <button id="resetSkin" class="secondary">🔄 Réinitialiser</button>
+      </div>
+      <div class="success" id="skinSuccess" style="display: none;"></div>
+      <div class="error" id="skinError" style="display: none;"></div>
     </div>
     
     <!-- Settings Tab -->

@@ -71,6 +71,7 @@ export class VodUnlockerFeature extends Feature {
 
     // Sauvegarder le Worker original
     this.originalWorker = (window as any).Worker;
+    this.log('Original Worker constructor saved:', typeof this.originalWorker);
 
     // Fetch le code du patch de manière synchrone pour l'injecter directement
     // Ceci contourne les restrictions de Brave sur importScripts() avec chrome-extension://
@@ -99,11 +100,17 @@ export class VodUnlockerFeature extends Feature {
       
       (window as any).Worker = class PatchedWorker extends self.originalWorker {
         constructor(twitchBlobUrl: string) {
+          self.log('🔧 Worker constructor called with URL:', twitchBlobUrl);
+          
           // Injecter directement le code du patch au lieu d'utiliser importScripts
           // Ceci fonctionne sur Brave car on ne fait pas de cross-origin importScripts
           const loaderCode = `
+            console.log('[NSV] 🚀 Patch code executing in Worker context');
+            
             // Code du patch injecté directement
             ${patchCode}
+            
+            console.log('[NSV] ✅ Patch code executed, now loading Twitch worker');
             
             // Ensuite charger le code Twitch original
             try {
@@ -117,6 +124,7 @@ export class VodUnlockerFeature extends Feature {
           const blob = new Blob([loaderCode], { type: 'application/javascript' });
           const patchedUrl = URL.createObjectURL(blob);
           
+          self.log('🎯 Creating patched Worker with blob URL');
           super(patchedUrl);
         }
       };

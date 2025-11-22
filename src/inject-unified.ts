@@ -9,45 +9,37 @@
 
 declare const chrome: any;
 
-// Fonction d'injection du script de page
+// Fonction d'injection du script de page - DOIT S'EXÉCUTER IMMÉDIATEMENT
 function injectPageScript() {
   const patchUrl = chrome.runtime.getURL('dist/patch_amazonworker.js');
   const pageScriptUrl = chrome.runtime.getURL('dist/page-script-entry.js');
+  const bootstrapUrl = chrome.runtime.getURL('dist/worker-patch-bootstrap.js');
   
-  // Attendre que documentElement existe (minimal DOM) avec timeout de sécurité
-  let attempts = 0;
-  const maxAttempts = 50; // 50ms max
-  
-  const inject = () => {
-    attempts++;
+  try {
+    // Charger le script bootstrap qui patche Worker de manière synchrone
+    // On passe l'URL du patch via un attribut data-*
+    const bootstrapScript = document.createElement('script');
+    bootstrapScript.src = bootstrapUrl;
+    bootstrapScript.setAttribute('data-patch-url', patchUrl);
+    (document.head || document.documentElement).appendChild(bootstrapScript);
     
-    if (!document.documentElement) {
-      if (attempts < maxAttempts) {
-        // Utiliser un micro-task au lieu de setTimeout pour être plus rapide
-        Promise.resolve().then(inject);
-      } else {
-        console.warn('[NSV] Failed to inject page script: documentElement not ready after', maxAttempts, 'attempts');
-      }
-      return;
-    }
+    console.log('[NSV] 🎯 Worker patch bootstrap injected');
     
-    try {
-      const pageScript = document.createElement('script');
-      pageScript.src = pageScriptUrl;
-      pageScript.setAttribute('data-patch-url', patchUrl);
-      pageScript.async = true; // Rendre le chargement asynchrone
-      
-      // Injecter dans documentElement directement (avant même head)
-      document.documentElement.insertBefore(pageScript, document.documentElement.firstChild);
-      
-      console.log('[NSV] Page script injected (attempt', attempts, ')');
-    } catch (error) {
-      console.error('[NSV] Error injecting page script:', error);
-    }
-  };
-  
-  inject();
+    // Ensuite charger le script de page complet (asynchrone)
+    const pageScript = document.createElement('script');
+    pageScript.src = pageScriptUrl;
+    pageScript.setAttribute('data-patch-url', patchUrl);
+    
+    (document.head || document.documentElement).appendChild(pageScript);
+    
+    console.log('[NSV] 📜 Page script loaded');
+  } catch (error) {
+    console.error('[NSV] ❌ Error injecting scripts:', error);
+  }
 }
+
+// S'exécute IMMÉDIATEMENT, même avant DOMContentLoaded
+injectPageScript();
 
 // Fonction pour charger les settings de chat de manière asynchrone
 async function loadChatSettings() {

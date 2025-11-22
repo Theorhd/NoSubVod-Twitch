@@ -11,6 +11,7 @@ import {
   ChatCustomizerFeature,
   RestrictionRemoverFeature,
   AdBlockerFeature,
+  TwitchSkinChanger,
 } from './features';
 
 /**
@@ -61,6 +62,13 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     featureClass: ChatCustomizerFeature,
     category: 'chat',
     tags: ['chat', 'badge', 'effect', 'customization']
+  },
+
+  // === UI CUSTOMIZATION ===
+  {
+    featureClass: TwitchSkinChanger,
+    category: 'ui',
+    tags: ['theme', 'colors', 'skin', 'customization', 'appearance']
   },
 
 ];

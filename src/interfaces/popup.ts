@@ -177,6 +177,8 @@ function setupTabs(): void {
         loadHistory();
       } else if (tabName === 'settings') {
         loadSettings();
+      } else if (tabName === 'skin') {
+        setupSkinChanger();
       }
     });
   });
@@ -868,6 +870,227 @@ function setupChatCustomization() {
       });
     });
   });
+}
+
+// ============================================
+// Skin Changer Section
+// ============================================
+
+interface SkinColors {
+  primary: string;
+  secondary: string;
+  background: string;
+  text: string;
+  link: string;
+  button: string;
+}
+
+async function setupSkinChanger(): Promise<void> {
+  const skinEnabled = document.getElementById('skinEnabled') as HTMLInputElement;
+  const applySkinBtn = document.getElementById('applySkin') as HTMLButtonElement;
+  const resetSkinBtn = document.getElementById('resetSkin') as HTMLButtonElement;
+  const skinSuccess = document.getElementById('skinSuccess')!;
+  const skinError = document.getElementById('skinError')!;
+  
+  // Color inputs
+  const colorInputs = {
+    primary: document.getElementById('colorPrimary') as HTMLInputElement,
+    secondary: document.getElementById('colorSecondary') as HTMLInputElement,
+    background: document.getElementById('colorBackground') as HTMLInputElement,
+    text: document.getElementById('colorText') as HTMLInputElement,
+    link: document.getElementById('colorLink') as HTMLInputElement,
+    button: document.getElementById('colorButton') as HTMLInputElement,
+  };
+  
+  // Text inputs
+  const textInputs = {
+    primary: document.getElementById('colorPrimaryText') as HTMLInputElement,
+    secondary: document.getElementById('colorSecondaryText') as HTMLInputElement,
+    background: document.getElementById('colorBackgroundText') as HTMLInputElement,
+    text: document.getElementById('colorTextText') as HTMLInputElement,
+    link: document.getElementById('colorLinkText') as HTMLInputElement,
+    button: document.getElementById('colorButtonText') as HTMLInputElement,
+  };
+  
+  // Preset buttons
+  const presetDark = document.getElementById('presetDark') as HTMLButtonElement;
+  const presetPurple = document.getElementById('presetPurple') as HTMLButtonElement;
+  const presetBlue = document.getElementById('presetBlue') as HTMLButtonElement;
+  const presetGreen = document.getElementById('presetGreen') as HTMLButtonElement;
+  
+  // Load current settings
+  const result = await chrome.storage.local.get(['twitchSkinColors', 'twitchSkinEnabled']);
+  const currentColors: SkinColors = result.twitchSkinColors || {
+    primary: '#1a1a1d',
+    secondary: '#2d2d30',
+    background: '#0e0e10',
+    text: '#e8e8e8',
+    link: '#8b9dc3',
+    button: '#4a5568'
+  };
+  
+  skinEnabled.checked = result.twitchSkinEnabled || false;
+  
+  // Set initial values
+  Object.keys(colorInputs).forEach((key) => {
+    const colorKey = key as keyof SkinColors;
+    colorInputs[colorKey].value = currentColors[colorKey];
+    textInputs[colorKey].value = currentColors[colorKey];
+  });
+  
+  // Sync color picker with text input
+  Object.keys(colorInputs).forEach((key) => {
+    const colorKey = key as keyof SkinColors;
+    
+    colorInputs[colorKey].addEventListener('input', () => {
+      textInputs[colorKey].value = colorInputs[colorKey].value;
+    });
+    
+    textInputs[colorKey].addEventListener('input', () => {
+      const value = textInputs[colorKey].value;
+      if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+        colorInputs[colorKey].value = value;
+      }
+    });
+  });
+  
+  // Apply skin
+  applySkinBtn.addEventListener('click', async () => {
+    skinSuccess.textContent = '';
+    skinSuccess.classList.remove('visible');
+    skinError.textContent = '';
+    skinError.classList.remove('visible');
+    
+    const colors: SkinColors = {
+      primary: colorInputs.primary.value,
+      secondary: colorInputs.secondary.value,
+      background: colorInputs.background.value,
+      text: colorInputs.text.value,
+      link: colorInputs.link.value,
+      button: colorInputs.button.value,
+    };
+    
+    try {
+      await chrome.storage.local.set({ 
+        twitchSkinColors: colors,
+        twitchSkinEnabled: skinEnabled.checked
+      });
+      
+      // Send message to all Twitch tabs
+      chrome.tabs.query({}, (tabs: any[]) => {
+        tabs.forEach((tab: any) => {
+          if (tab.url && tab.url.includes('twitch.tv')) {
+            chrome.tabs.sendMessage(tab.id, { 
+              action: 'updateTwitchSkin', 
+              colors 
+            }, () => {
+              if (chrome.runtime.lastError) {
+                // Ignore errors for tabs without content script
+              }
+            });
+          }
+        });
+      });
+      
+      skinSuccess.textContent = '✅ Thème appliqué avec succès ! Rechargez les onglets Twitch pour voir les changements.';
+      skinSuccess.classList.add('visible');
+      
+      setTimeout(() => {
+        skinSuccess.textContent = '';
+        skinSuccess.classList.remove('visible');
+      }, 5000);
+    } catch (e: any) {
+      skinError.textContent = '❌ Erreur: ' + (e.message || e);
+      skinError.classList.add('visible');
+    }
+  });
+  
+  // Reset skin
+  resetSkinBtn.addEventListener('click', async () => {
+    const defaultColors: SkinColors = {
+      primary: '#1a1a1d',
+      secondary: '#2d2d30',
+      background: '#0e0e10',
+      text: '#e8e8e8',
+      link: '#8b9dc3',
+      button: '#4a5568'
+    };
+    
+    Object.keys(colorInputs).forEach((key) => {
+      const colorKey = key as keyof SkinColors;
+      colorInputs[colorKey].value = defaultColors[colorKey];
+      textInputs[colorKey].value = defaultColors[colorKey];
+    });
+    
+    skinSuccess.textContent = '🔄 Couleurs réinitialisées aux valeurs par défaut';
+    skinSuccess.classList.add('visible');
+    
+    setTimeout(() => {
+      skinSuccess.textContent = '';
+      skinSuccess.classList.remove('visible');
+    }, 3000);
+  });
+  
+  // Presets
+  presetDark.addEventListener('click', () => {
+    applyPreset({
+      primary: '#1a1a1d',
+      secondary: '#2d2d30',
+      background: '#0e0e10',
+      text: '#e8e8e8',
+      link: '#8b9dc3',
+      button: '#4a5568'
+    });
+  });
+  
+  presetPurple.addEventListener('click', () => {
+    applyPreset({
+      primary: '#1e1b2e',
+      secondary: '#352f44',
+      background: '#0f0d1a',
+      text: '#dbd8e3',
+      link: '#9b87c7',
+      button: '#7e6ba8'
+    });
+  });
+  
+  presetBlue.addEventListener('click', () => {
+    applyPreset({
+      primary: '#1a2332',
+      secondary: '#2d3e50',
+      background: '#0d1520',
+      text: '#d4dce6',
+      link: '#7ba3c7',
+      button: '#5a7fa3'
+    });
+  });
+  
+  presetGreen.addEventListener('click', () => {
+    applyPreset({
+      primary: '#1a2921',
+      secondary: '#2d3e35',
+      background: '#0f1913',
+      text: '#d8e3dd',
+      link: '#7fb69e',
+      button: '#5a9178'
+    });
+  });
+  
+  function applyPreset(colors: SkinColors): void {
+    Object.keys(colorInputs).forEach((key) => {
+      const colorKey = key as keyof SkinColors;
+      colorInputs[colorKey].value = colors[colorKey];
+      textInputs[colorKey].value = colors[colorKey];
+    });
+    
+    skinSuccess.textContent = '🎨 Préréglage appliqué';
+    skinSuccess.classList.add('visible');
+    
+    setTimeout(() => {
+      skinSuccess.textContent = '';
+      skinSuccess.classList.remove('visible');
+    }, 2000);
+  }
 }
 
 init();

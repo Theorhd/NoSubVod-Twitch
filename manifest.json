@@ -22,6 +22,7 @@
       "resources": [
         "dist/page-script-entry.js",
         "dist/patch_amazonworker.js",
+        "dist/worker-patch-bootstrap.js",
         "assets/badges/*"
       ],
       "matches": [
@@ -36,7 +37,7 @@
         "dist/inject-unified.js"
       ],
       "all_frames": false,
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "host_permissions": [
