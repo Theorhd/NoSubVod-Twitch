@@ -7,7 +7,7 @@ import { Feature, FeatureConfig, FeatureContext } from '../core/Feature';
 
 export class InterfaceChangerFeature extends Feature {
   private observer: MutationObserver | null = null;
-  private modifiedButtons = new WeakSet<HTMLElement>();
+  private readonly modifiedButtons = new WeakSet<HTMLElement>();
 
   constructor() {
     const config: FeatureConfig = {
@@ -107,7 +107,7 @@ export class InterfaceChangerFeature extends Feature {
     }
 
     const button = element as HTMLElement;
-    const dataTarget = button.getAttribute('data-a-target')?.toLowerCase() || '';
+    const dataTarget = button.dataset.aTarget?.toLowerCase() || '';
     if (dataTarget.includes('subscribe')) {
       return true;
     }
@@ -137,8 +137,8 @@ export class InterfaceChangerFeature extends Feature {
     }
     this.modifiedButtons.add(button);
 
-    button.setAttribute('data-nsv-original-aria-label', button.getAttribute('aria-label') || '');
-    button.setAttribute('data-nsv-modified', 'true');
+    button.dataset.nsvOriginalAriaLabel = button.getAttribute('aria-label') || '';
+    button.dataset.nsvModified = 'true';
 
     (button as HTMLButtonElement).disabled = true;
 
@@ -169,10 +169,8 @@ export class InterfaceChangerFeature extends Feature {
     let newLabel = 'Subscribed';
     let newText = 'Subscribed';
 
-    if (ariaLabel.includes('s\'abonner') || text.includes('s\'abonner')) {
-      newLabel = 'Abonné';
-      newText = 'Abonné';
-    } else if (ariaLabel.includes('se réabonner') || text.includes('se réabonner')) {
+    if (ariaLabel.includes('s\'abonner') || text.includes('s\'abonner') ||
+        ariaLabel.includes('se réabonner') || text.includes('se réabonner')) {
       newLabel = 'Abonné';
       newText = 'Abonné';
     }
@@ -211,7 +209,7 @@ export class InterfaceChangerFeature extends Feature {
           }
         });
       } catch (e) {
-        // Invalid selector, skip
+        this.log(`Invalid selector "${selector}": ${e instanceof Error ? e.message : 'Unknown error'}`);
       }
     });
   }

@@ -3,6 +3,8 @@ declare const chrome: any;
 import { storage, VodDownload, Settings, ActiveDownload } from '../utils/storage';
 import { badgeManager, Badge, PRESET_BADGES } from '../utils/badge-manager';
 
+import { formatBytes, formatTime, parseTime, extractVodId, getThumbnailUrl, createOption } from '../utils/helpers';
+
 // Util: current active tab URL
 async function getActiveTabUrl(): Promise<string | null> {
   return new Promise((resolve) => {
@@ -10,16 +12,6 @@ async function getActiveTabUrl(): Promise<string | null> {
       resolve(tabs[0]?.url ?? null);
     });
   });
-}
-
-function extractVodId(url: string): string | null {
-  try {
-    const u = new URL(url);
-    const m = u.pathname.match(/\/videos\/(\d+)/);
-    return m ? m[1] : null;
-  } catch {
-    return null;
-  }
 }
 
 async function fetchTwitchVideo(vodID: string): Promise<any> {
@@ -35,11 +27,6 @@ async function fetchTwitchVideo(vodID: string): Promise<any> {
     }
   });
   return resp.json();
-}
-
-function getThumbnailUrl(vodId: string, width: number = 320, height: number = 180): string {
-  // Generate Twitch thumbnail URL pattern
-  return `https://static-cdn.jtvnw.net/cf_vods/${vodId}/thumb/thumb0-${width}x${height}.jpg`;
 }
 
 function buildStreamUrl(domain: string, vodSpecialID: string, resKey: string, vodId: string, channelLogin: string, broadcastType: string, createdAt: string): string {
@@ -68,13 +55,6 @@ async function probeQuality(url: string): Promise<boolean> {
   }
 }
 
-function createOption(value: string, label: string): HTMLOptionElement {
-  const opt = document.createElement('option');
-  opt.value = value;
-  opt.textContent = label;
-  return opt;
-}
-
 function showNotification(title: string, message: string, iconUrl = chrome.runtime.getURL('assets/icons/icon.png')): void {
   storage.getSettings().then(settings => {
     if (settings.enableNotifications) {
@@ -86,39 +66,6 @@ function showNotification(title: string, message: string, iconUrl = chrome.runti
       });
     }
   });
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-}
-
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return '—';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-}
-// Convertit une chaîne hh:mm:ss en secondes
-function parseTime(str: string): number | null {
-  const parts = str.split(':').map(p => parseInt(p, 10));
-  if (parts.some(isNaN)) return null;
-  if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  }
-  if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
-  }
-  if (parts.length === 1) {
-    return parts[0];
-  }
-  return null;
 }
 
 class ProgressTracker {
@@ -883,6 +830,7 @@ interface SkinColors {
   text: string;
   link: string;
   button: string;
+  playerControls: string;
 }
 
 async function setupSkinChanger(): Promise<void> {

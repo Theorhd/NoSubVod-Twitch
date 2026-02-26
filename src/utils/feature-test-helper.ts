@@ -3,7 +3,8 @@
  * Utilitaires pour tester les features dans la console du navigateur
  */
 
-import { FeatureManager } from './core/FeatureManager';
+import { FeatureManager } from '../core/FeatureManager';
+import { Feature } from '../core/Feature';
 
 declare global {
   interface Window {
@@ -48,7 +49,7 @@ export const NSV = {
     const features = manager.getAllFeatures();
     
     console.group(`📋 Features (${features.length} total)`);
-    features.forEach(feature => {
+    features.forEach((feature: Feature) => {
       const config = feature.getConfig();
       const status = feature.isEnabled() ? '✅ Enabled' : '❌ Disabled';
       
@@ -78,7 +79,7 @@ export const NSV = {
     const features = manager.getEnabledFeatures();
     
     console.group(`✅ Enabled Features (${features.length})`);
-    features.forEach(feature => {
+    features.forEach((feature: Feature) => {
       const config = feature.getConfig();
       console.log(`• ${config.name} (${config.id})`);
     });

@@ -23,7 +23,7 @@
   const PATCH_URL = patchUrlFromAttr;
   
   (window as any).Worker = class PatchedWorker extends OriginalWorker {
-    constructor(scriptURL: string | URL) {
+    constructor(scriptURL: string | URL, options?: WorkerOptions) {
       console.log('[NSV] 🔧 Worker constructor intercepted! URL:', scriptURL);
       
       const url = typeof scriptURL === 'string' ? scriptURL : scriptURL.toString();
@@ -66,11 +66,11 @@
         const blob = new Blob([loaderCode], { type: 'application/javascript' });
         const patchedURL = URL.createObjectURL(blob);
         
-        super(patchedURL);
+        super(patchedURL, options);
       } else {
         // Autres Workers, laisser passer
         console.log('[NSV] ⏭️  Non-Amazon Worker, passing through');
-        super(scriptURL);
+        super(scriptURL, options);
       }
     }
   };

@@ -271,12 +271,12 @@ export class ChatCustomizerFeature extends Feature {
   }
 
   private watchUrlChanges(): void {
-    this.lastUrl = window.location.href;
+    this.lastUrl = globalThis.location.href;
     
     setInterval(() => {
-      if (window.location.href !== this.lastUrl) {
+      if (globalThis.location.href !== this.lastUrl) {
         this.log('URL changed, reinitializing...');
-        this.lastUrl = window.location.href;
+        this.lastUrl = globalThis.location.href;
         this.onPageChange();
       }
     }, 1000);
@@ -286,7 +286,7 @@ export class ChatCustomizerFeature extends Feature {
     this.modifiedElements = new WeakSet<Element>();
     this.getCurrentUsername();
     
-    window.dispatchEvent(new CustomEvent('NSV_RELOAD_SETTINGS'));
+    globalThis.dispatchEvent(new CustomEvent('NSV_RELOAD_SETTINGS'));
     
     setTimeout(() => {
       this.reprocessAllMessages();
@@ -294,7 +294,7 @@ export class ChatCustomizerFeature extends Feature {
   }
 
   private setupSettingsListener(): void {
-    window.addEventListener('NSV_SETTINGS_UPDATED', (event: any) => {
+    globalThis.addEventListener('NSV_SETTINGS_UPDATED', (event: any) => {
       const newSettings = event.detail;
       this.log('Settings updated via CustomEvent:', newSettings);
       this.settings = { ...this.settings, ...newSettings };
@@ -306,8 +306,11 @@ export class ChatCustomizerFeature extends Feature {
       this.reprocessAllMessages();
     });
 
-    window.addEventListener('message', (event: any) => {
-      if (event.data && event.data.type === 'CHAT_CUSTOMIZATION_UPDATED') {
+    globalThis.addEventListener('message', (event: any) => {
+      if (event.origin !== globalThis.location.origin) {
+        return;
+      }
+      if (event.data?.type === 'CHAT_CUSTOMIZATION_UPDATED') {
         this.log('Settings updated via message:', event.data.settings);
         this.settings = { ...this.settings, ...event.data.settings };
         if (this.settings.enableMyBadge && this.settings.myBadgeText) {
@@ -327,7 +330,7 @@ export class ChatCustomizerFeature extends Feature {
     const maxAttempts = 10; // 10 attempts over 5 seconds
     const settingsPoller = setInterval(() => {
       attempts++;
-      if ((window as any).NSV_SETTINGS && Object.keys((window as any).NSV_SETTINGS).length > 0) {
+      if ((globalThis as any).NSV_SETTINGS && Object.keys((globalThis as any).NSV_SETTINGS).length > 0) {
         this.log('Settings detected after polling');
         this.initializeSettings();
         clearInterval(settingsPoller);
@@ -339,10 +342,10 @@ export class ChatCustomizerFeature extends Feature {
   }
 
   private initializeSettings(): void {
-    if ((window as any).NSV_SETTINGS) {
-      const hasSettings = Object.keys((window as any).NSV_SETTINGS).length > 0;
-      this.settings = { ...this.settings, ...(window as any).NSV_SETTINGS };
-      this.log('Settings loaded from window.NSV_SETTINGS:', this.settings);
+    if ((globalThis as any).NSV_SETTINGS) {
+      const hasSettings = Object.keys((globalThis as any).NSV_SETTINGS).length > 0;
+      this.settings = { ...this.settings, ...(globalThis as any).NSV_SETTINGS };
+      this.log('Settings loaded from globalThis.NSV_SETTINGS:', this.settings);
       if (this.settings.enableMyBadge && this.settings.myBadgeText) {
         this.injectHideBadgesCSS();
       }
@@ -354,7 +357,7 @@ export class ChatCustomizerFeature extends Feature {
         }, 100);
       }
     } else {
-      this.log('No settings found in window.NSV_SETTINGS, using defaults');
+      this.log('No settings found in globalThis.NSV_SETTINGS, using defaults');
     }
   }
 
@@ -386,7 +389,7 @@ export class ChatCustomizerFeature extends Feature {
     if (!userElement) {
       const firstMessage = document.querySelector('[data-a-user]');
       if (firstMessage) {
-        const username = firstMessage.getAttribute('data-a-user');
+        const username = (firstMessage as HTMLElement).dataset.aUser;
         if (username) {
           this.currentUsername = username;
           this.log('Current username detected from message:', this.currentUsername);
@@ -395,7 +398,7 @@ export class ChatCustomizerFeature extends Feature {
       }
     }
 
-    if (userElement && userElement.textContent) {
+    if (userElement?.textContent) {
       this.currentUsername = userElement.textContent.trim();
       this.log('Current username detected from DOM:', this.currentUsername);
       return;
@@ -408,9 +411,9 @@ export class ChatCustomizerFeature extends Feature {
     const nameEQ = name + '=';
     const cookies = document.cookie.split(';');
     for (let cookie of cookies) {
-      cookie = cookie.trim();
-      if (cookie.indexOf(nameEQ) === 0) {
-        return decodeURIComponent(cookie.substring(nameEQ.length));
+      const trimmedCookie = cookie.trim();
+      if (trimmedCookie.startsWith(nameEQ)) {
+        return decodeURIComponent(trimmedCookie.substring(nameEQ.length));
       }
     }
     return '';
@@ -419,7 +422,7 @@ export class ChatCustomizerFeature extends Feature {
   private startPolling(): void {
     this.log('Starting chat monitoring with polling');
     
-    this.pollingInterval = window.setInterval(() => {
+    this.pollingInterval = globalThis.setInterval(() => {
       if (!this.isProcessing) {
         this.processExistingMessages();
       }
@@ -451,7 +454,7 @@ export class ChatCustomizerFeature extends Feature {
       return;
     }
 
-    const username = chatLine.getAttribute('data-a-user');
+    const username = (chatLine as HTMLElement).dataset.aUser;
     if (!username || username !== this.currentUsername) {
       return;
     }
@@ -551,14 +554,14 @@ export class ChatCustomizerFeature extends Feature {
     }
 
     displayName.classList.remove('nsv-username-effect');
-    displayName.removeAttribute('data-effect');
+    delete displayName.dataset.effect;
 
     const effectStyle = this.colorEffects[this.settings.myEffect];
     if (!effectStyle || !this.styleSheet) return;
 
     try {
       this.updateEffectStyleSheet(this.settings.myEffect, effectStyle);
-      displayName.setAttribute('data-effect', this.settings.myEffect);
+      displayName.dataset.effect = this.settings.myEffect;
       displayName.classList.add('nsv-username-effect');
     } catch (e) {
       this.logError('Error applying effect:', e);

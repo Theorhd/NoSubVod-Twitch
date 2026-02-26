@@ -76,7 +76,7 @@ export class AdBlockerFeature extends Feature {
     this.startObserver();
     
     // Vérifier les publicités toutes les 200ms pour une réactivité maximale
-    this.adCheckInterval = window.setInterval(() => {
+    this.adCheckInterval = globalThis.setInterval(() => {
       this.checkAndHandleAds();
     }, 200);
     
@@ -258,7 +258,7 @@ export class AdBlockerFeature extends Feature {
     
     // Vérifier si c'est un élément publicitaire
     adSelectorsToHide.forEach(selector => {
-      if (node.matches && node.matches(selector)) {
+      if (node.matches?.(selector)) {
         this.hideAdElement(node);
       }
     });
@@ -350,9 +350,7 @@ export class AdBlockerFeature extends Feature {
 
   private handleVideoAds(): void {
     // Trouver l'élément vidéo principal
-    if (!this.videoElement) {
-      this.videoElement = document.querySelector('video') as HTMLVideoElement;
-    }
+    this.videoElement ??= document.querySelector('video') as HTMLVideoElement;
 
     if (this.videoElement) {
       // Vérifier si la source contient "ads" ou "commercial"
@@ -368,7 +366,7 @@ export class AdBlockerFeature extends Feature {
           this.videoElement.muted = true;
           
           // 2. Essayer de sauter à la fin de la vidéo
-          if (this.videoElement.duration && isFinite(this.videoElement.duration)) {
+          if (this.videoElement.duration && Number.isFinite(this.videoElement.duration)) {
             this.videoElement.currentTime = this.videoElement.duration - 0.1;
             this.log('Skipped to end of ad');
           }
@@ -381,12 +379,10 @@ export class AdBlockerFeature extends Feature {
         } catch (e) {
           this.logError('Failed to handle ad video', e);
         }
-      } else {
+      } else if (this.videoElement.playbackRate > 1) {
         // Restaurer la vitesse normale pour le contenu
-        if (this.videoElement.playbackRate > 1) {
-          this.videoElement.playbackRate = 1;
-          (this.videoElement as HTMLElement).style.opacity = '1';
-        }
+        this.videoElement.playbackRate = 1;
+        (this.videoElement as HTMLElement).style.opacity = '1';
       }
     }
   }
@@ -396,8 +392,8 @@ export class AdBlockerFeature extends Feature {
     
     try {
       // Intercepter les requêtes de publicités
-      const originalFetch = window.fetch;
-      window.fetch = async (...args) => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (...args) => {
         const url = args[0] as string;
         
         // Bloquer les requêtes vers les serveurs de publicités
@@ -416,17 +412,15 @@ export class AdBlockerFeature extends Feature {
           });
         }
         
-        return originalFetch.apply(window, args);
+        return originalFetch.apply(globalThis, args);
       };
       
       // Tenter de patcher les méthodes du player Twitch
-      if ((window as any).Twitch && (window as any).Twitch.player) {
-        const player = (window as any).Twitch.player;
-        
-        // Désactiver les publicités dans la configuration du player
-        if (player.setPlayerOptions) {
-          player.setPlayerOptions({ ads: { enabled: false } });
-        }
+      const player = (globalThis as any).Twitch?.player;
+      
+      // Désactiver les publicités dans la configuration du player
+      if (player?.setPlayerOptions) {
+        player.setPlayerOptions({ ads: { enabled: false } });
       }
       
       this.log('Player patched successfully');

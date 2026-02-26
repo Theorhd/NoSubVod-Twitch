@@ -40,6 +40,17 @@ async function isValidQuality(url: string): Promise<{ codec: string } | null> {
   return null;
 }
 
+function isRestrictedManifest(body: string): boolean {
+  const lower = body.toLowerCase();
+  return (
+    lower.includes('vod_manifest_restricted') ||
+    lower.includes('errorauthorization') ||
+    lower.includes('restricted=1') ||
+    lower.includes('restricted="true"') ||
+    lower.includes('#ext-x-twitch-restricted')
+  );
+}
+
 const oldFetch = (self as any).fetch;
 
 (self as any).fetch = async function(input: RequestInfo, init?: RequestInit): Promise<Response> {
@@ -77,13 +88,24 @@ const oldFetch = (self as any).fetch;
   if (url.startsWith('https://usher.ttvnw.net/vod/')) {
     console.log('[NSV] Usher VOD request detected - URL:', url);
     console.log('[NSV] Response status:', response.status);
-    
-    if (response.status !== 200) {
+
+    let shouldPatch = response.status !== 200;
+
+    if (response.status === 200) {
+      const body = await response.text();
+      if (!isRestrictedManifest(body)) {
+        return new Response(body, { status: 200, headers: response.headers });
+      }
+      shouldPatch = true;
+      console.log('[NSV] Restricted manifest detected, generating fake playlist');
+    }
+
+    if (shouldPatch) {
       // Extract vodId, removing any version prefix (v2/, v3/, etc.)
       let vodId = url.split('https://usher.ttvnw.net/vod/')[1].split('.m3u8')[0];
       vodId = vodId.replace(/^v\d+\//, ''); // Remove v2/, v3/, etc.
       
-      console.log('[NSV] Non-200 response, patching VOD:', vodId);
+      console.log('[NSV] Patching VOD manifest:', vodId);
       const data = await fetchTwitchDataGQL(vodId);
       console.log('[NSV] GQL response:', JSON.stringify(data));
       
@@ -182,8 +204,6 @@ ${streamUrl}`;
       const headers = new Headers({ 'Content-Type': 'application/vnd.apple.mpegurl' });
       console.log('[NSV] Returning fake playlist with', fakePlaylist.split('\n').length, 'lines');
       return new Response(fakePlaylist, { status: 200, headers });
-    } else {
-      console.log('[NSV] Usher returned 200, using original response');
     }
   }
 

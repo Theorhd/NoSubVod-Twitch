@@ -11,7 +11,7 @@ import { instantiateAllFeatures } from './feature-registry';
 // Initialiser le gestionnaire de features pour le contexte content script
 const manager = new FeatureManager({
   context: FeatureContext.CONTENT_SCRIPT,
-  currentUrl: window.location.href,
+  currentUrl: globalThis.location.href,
   storage: new ChromeStorageAdapter()
 });
 
@@ -31,19 +31,19 @@ manager.initializeAll().then(() => {
   const _push = history.pushState;
   history.pushState = function(...args) {
     const res = _push.apply(this, args as any);
-    window.dispatchEvent(new Event('locationchange'));
+    globalThis.dispatchEvent(new Event('locationchange'));
     return res;
   };
   const _replace = history.replaceState;
   history.replaceState = function(...args) {
     const res = _replace.apply(this, args as any);
-    window.dispatchEvent(new Event('locationchange'));
+    globalThis.dispatchEvent(new Event('locationchange'));
     return res;
   };
-  window.addEventListener('popstate', () => window.dispatchEvent(new Event('locationchange')));
+  globalThis.addEventListener('popstate', () => globalThis.dispatchEvent(new Event('locationchange')));
 })();
 
 // Exposer le manager globalement pour le debug
-(window as any).__NSV_CONTENT_MANAGER__ = manager;
+(globalThis as any).__NSV_CONTENT_MANAGER__ = manager;
 
 export {};

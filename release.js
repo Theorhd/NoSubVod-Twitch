@@ -43,12 +43,15 @@ const filesToCopy = [
   { from: 'dist/worker-patch-bootstrap.js', to: 'release/dist/worker-patch-bootstrap.js' },
   { from: 'dist/popup.js', to: 'release/dist/popup.js' },
   { from: 'dist/popup.html', to: 'release/dist/popup.html' },
+  { from: 'dist/popup.css', to: 'release/dist/popup.css' },
   { from: 'dist/settings.js', to: 'release/dist/settings.js' },
   { from: 'dist/settings.html', to: 'release/dist/settings.html' },
+  { from: 'dist/settings.css', to: 'release/dist/settings.css' },
   { from: 'dist/download.js', to: 'release/dist/download.js' },
   { from: 'dist/download.html', to: 'release/dist/download.html' },
   { from: 'dist/offscreen.js', to: 'release/dist/offscreen.js' },
   { from: 'dist/offscreen.html', to: 'release/dist/offscreen.html' },
+  { from: 'dist/theme.css', to: 'release/dist/theme.css' },
   
   // Assets
   { from: 'assets/icons/icon.png', to: 'release/assets/icons/icon.png' },

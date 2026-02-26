@@ -153,7 +153,7 @@ startBtn.addEventListener('click', async () => {
       
       // Create a blob for this batch and add it to parts
       if (batchBuffers.length > 0) {
-        const batchBlob = new Blob(batchBuffers, { type: 'video/mp2t' });
+        const batchBlob = new Blob(batchBuffers, { type: fileFormat === 'mp4' ? 'video/mp4' : 'video/mp2t' });
         blobParts.push(batchBlob);
         console.log(`[NoSubVod Download] Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} processed`);
       }

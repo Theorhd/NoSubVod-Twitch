@@ -10,7 +10,7 @@ import { instantiateAllFeatures } from './feature-registry';
 // Initialiser le gestionnaire de features pour le contexte content script
 const contentManager = new FeatureManager({
   context: FeatureContext.CONTENT_SCRIPT,
-  currentUrl: window.location.href,
+  currentUrl: globalThis.location.href,
   storage: new ChromeStorageAdapter()
 });
 
@@ -26,6 +26,6 @@ contentManager.initializeAll().then(() => {
 });
 
 // Exposer le manager globalement pour le debug
-(window as any).__NSV_CONTENT_MANAGER__ = contentManager;
+(globalThis as any).__NSV_CONTENT_MANAGER__ = contentManager;
 
 export {};

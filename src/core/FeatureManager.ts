@@ -23,8 +23,8 @@ export interface FeatureStorage {
 }
 
 export class FeatureManager {
-  private features: Map<string, Feature> = new Map();
-  private config: FeatureManagerConfig;
+  private readonly features: Map<string, Feature> = new Map();
+  private readonly config: FeatureManagerConfig;
   private initialized: boolean = false;
 
   constructor(config: FeatureManagerConfig) {
@@ -141,7 +141,7 @@ export class FeatureManager {
     const unresolved = new Set(this.features.keys());
 
     const resolve = (featureId: string, resolving: Set<string> = new Set()): void => {
-      if (resolved.find(f => f.getId() === featureId)) {
+      if (resolved.some(f => f.getId() === featureId)) {
         return; // Déjà résolu
       }
 

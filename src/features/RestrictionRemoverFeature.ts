@@ -51,7 +51,7 @@ export class RestrictionRemoverFeature extends Feature {
   }
 
   private setupSPANavigation(): void {
-    window.addEventListener('locationchange', () => {
+    globalThis.addEventListener('locationchange', () => {
       this.log('SPA navigation detected, removing restrictions');
       this.removeExistingRestrictions();
     });
@@ -66,7 +66,7 @@ export class RestrictionRemoverFeature extends Feature {
           }
         });
       } catch (e) {
-        // Invalid selector, skip
+        this.log(`Invalid selector "${selector}": ${e}`);
       }
     });
   }
@@ -102,21 +102,7 @@ export class RestrictionRemoverFeature extends Feature {
     }
 
     this.observer = new MutationObserver(mutations => {
-      // Debouncing : traiter les mutations groupées
-      if (this.debounceTimer !== null) {
-        clearTimeout(this.debounceTimer);
-      }
-      
-      this.debounceTimer = window.setTimeout(() => {
-        mutations.forEach(mutation => {
-          mutation.addedNodes.forEach(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-              this.processNode(node as Element);
-            }
-          });
-        });
-        this.debounceTimer = null;
-      }, 150); // Attendre 150ms avant de traiter
+      this.handleMutations(mutations);
     });
 
     this.observer.observe(document.body, {
@@ -125,6 +111,28 @@ export class RestrictionRemoverFeature extends Feature {
     });
 
     this.log('Observer started');
+  }
+
+  private handleMutations(mutations: MutationRecord[]): void {
+    // Debouncing : traiter les mutations groupées
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+    }
+    
+    this.debounceTimer = globalThis.setTimeout(() => {
+      this.processMutations(mutations);
+      this.debounceTimer = null;
+    }, 150); // Attendre 150ms avant de traiter
+  }
+
+  private processMutations(mutations: MutationRecord[]): void {
+    mutations.forEach(mutation => {
+      mutation.addedNodes.forEach(node => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          this.processNode(node as Element);
+        }
+      });
+    });
   }
 
   private stopObserver(): void {
@@ -161,7 +169,7 @@ export class RestrictionRemoverFeature extends Feature {
           }
         });
       } catch (e) {
-        // Invalid selector, skip
+        this.log(`Invalid selector "${selector}": ${e}`);
       }
     });
   }

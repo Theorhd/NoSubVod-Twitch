@@ -69,12 +69,10 @@ export class TwitchSkinChanger extends Feature {
           this.applyColors(this.currentColors);
         }
       });
+    } else if (this.currentColors) {
+      this.applyColors(this.currentColors);
     } else {
-      if (this.currentColors) {
-        this.applyColors(this.currentColors);
-      } else {
-        this.log('No colors to apply yet');
-      }
+      this.log('No colors to apply yet');
     }
     
     // Écouter les changements de couleurs depuis la popup
@@ -126,6 +124,15 @@ export class TwitchSkinChanger extends Feature {
     // Générer le CSS avec les couleurs personnalisées
     this.styleElement.textContent = `
       /* NSV Twitch Skin Changer - Custom Colors */
+      :root {
+        --nsv-bg-base: ${colors.background};
+        --nsv-color-primary: ${colors.primary};
+        --nsv-color-secondary: ${colors.secondary};
+        --nsv-color-text: ${colors.text};
+        --nsv-color-link: ${colors.link};
+        --nsv-color-button: ${colors.button};
+        --nsv-color-player: ${colors.playerControls};
+      }
       
       /* ===== PRIORITÉ ABSOLUE : PLAYER TOUJOURS TRANSPARENT ===== */
       .video-player,
@@ -152,15 +159,11 @@ export class TwitchSkinChanger extends Feature {
       /* Barre de progression (seekbar segment) - COULEUR PERSONNALISÉE */
       [data-test-selector="seekbar-segment__segment"],
       .seekbar-segment,
-      [class*="seekbar-segment"] {
-        background-color: ${colors.playerControls} !important;
-      }
-      
-      /* Autres éléments de la seekbar si besoin */
+      [class*="seekbar-segment"],
       .tw-range__track-fill,
       [class*="SeekBarFill"],
       .player-seekbar__value {
-        background-color: ${colors.playerControls} !important;
+        background-color: var(--nsv-color-player) !important;
       }
       
       /* Boutons de contrôle du player - garder visibles */
@@ -179,15 +182,11 @@ export class TwitchSkinChanger extends Feature {
       .side-nav-section,
       .side-nav-card,
       [data-a-target="side-nav-header"],
-      .side-bar-contents {
-        background-color: ${colors.primary} !important;
-      }
-      
-      /* Top Navigation */
+      .side-bar-contents,
       .top-nav,
       nav[aria-label="Primary"],
       .top-nav__menu {
-        background-color: ${colors.primary} !important;
+        background-color: var(--nsv-color-primary) !important;
       }
       
       /* Hover states */
@@ -195,7 +194,7 @@ export class TwitchSkinChanger extends Feature {
       .side-nav-card__live-status:hover,
       .tw-interactive:hover,
       .tw-button:hover {
-        background-color: ${colors.secondary} !important;
+        background-color: var(--nsv-color-secondary) !important;
       }
       
       /* Background - SAUF PLAYER */
@@ -208,7 +207,7 @@ export class TwitchSkinChanger extends Feature {
       .chat-input,
       .channel-root,
       .hoYUtL {
-        background-color: ${colors.background} !important;
+        background-color: var(--nsv-bg-base) !important;
       }
       
       /* Cards & Panels */
@@ -220,8 +219,8 @@ export class TwitchSkinChanger extends Feature {
       .chat-room,
       .tw-pd-1,
       .tw-pd-2 {
-        background-color: ${colors.background} !important;
-        border-color: ${colors.secondary} !important;
+        background-color: var(--nsv-bg-base) !important;
+        border-color: var(--nsv-color-secondary) !important;
       }
       
       /* Text */
@@ -234,7 +233,7 @@ export class TwitchSkinChanger extends Feature {
       .tw-font-size-5,
       .chat-line__message,
       .text-fragment {
-        color: ${colors.text} !important;
+        color: var(--nsv-color-text) !important;
       }
       
       /* Links */
@@ -242,7 +241,7 @@ export class TwitchSkinChanger extends Feature {
       .tw-link,
       .channel-info-content a,
       .chat-line__username {
-        color: ${colors.link} !important;
+        color: var(--nsv-color-link) !important;
       }
       
       /* Buttons */
@@ -251,15 +250,15 @@ export class TwitchSkinChanger extends Feature {
       [data-a-target="follow-button"],
       [data-a-target="subscribe-button"],
       .chat-input__buttons-container button {
-        background-color: ${colors.button} !important;
-        border-color: ${colors.button} !important;
-        color: ${colors.text} !important;
+        background-color: var(--nsv-color-button) !important;
+        border-color: var(--nsv-color-button) !important;
+        color: var(--nsv-color-text) !important;
       }
       
       /* Buttons primary */
       .tw-button--primary,
       .tw-core-button--primary {
-        background-color: ${colors.secondary} !important;
+        background-color: var(--nsv-color-secondary) !important;
       }
       
       /* Input fields */
@@ -267,18 +266,18 @@ export class TwitchSkinChanger extends Feature {
       input[type="text"],
       textarea,
       .chat-input textarea {
-        background-color: ${colors.background} !important;
-        border-color: ${colors.secondary} !important;
-        color: ${colors.text} !important;
+        background-color: var(--nsv-bg-base) !important;
+        border-color: var(--nsv-color-secondary) !important;
+        color: var(--nsv-color-text) !important;
       }
       
       /* Scrollbars */
       ::-webkit-scrollbar-track {
-        background-color: ${colors.background} !important;
+        background-color: var(--nsv-bg-base) !important;
       }
       
       ::-webkit-scrollbar-thumb {
-        background-color: ${colors.secondary} !important;
+        background-color: var(--nsv-color-secondary) !important;
       }
       
       /* Chat badges & emotes - preserve original colors */
@@ -294,11 +293,9 @@ export class TwitchSkinChanger extends Feature {
   }
 
   private removeColors(): void {
-    if (this.styleElement && this.styleElement.parentNode) {
-      this.styleElement.parentNode.removeChild(this.styleElement);
-      this.styleElement = null;
-      this.log('Colors removed');
-    }
+    this.styleElement?.remove();
+    this.styleElement = null;
+    this.log('Colors removed');
   }
 
   /**

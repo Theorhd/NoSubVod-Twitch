@@ -104,11 +104,20 @@ async function downloadVod(
     // Construire la liste des segments avec leurs durées
     const lines = playlistText.split('\n');
     const entries: { url: string; duration: number }[] = [];
+    let initSegmentUrl: string | null = null;
     let lastDur = 0;
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed.startsWith('#EXTINF')) {
-        lastDur = parseFloat(trimmed.split(':')[1]) || 0;
+      if (trimmed.startsWith('#EXT-X-MAP')) {
+        const match = /URI="([^"]+)"/i.exec(trimmed) || /URI=([^,\s]+)/i.exec(trimmed);
+        const rawUrl = match?.[1]?.replace(/"/g, '');
+        if (rawUrl) {
+          initSegmentUrl = rawUrl.startsWith('http')
+            ? rawUrl
+            : new URL(rawUrl, playlistUrl).toString();
+        }
+      } else if (trimmed.startsWith('#EXTINF')) {
+        lastDur = Number.parseFloat(trimmed.split(':')[1]) || 0;
       } else if (trimmed && !trimmed.startsWith('#')) {
         const url = trimmed.startsWith('http')
           ? trimmed
@@ -120,6 +129,14 @@ async function downloadVod(
     console.log(`[NoSubVod] Found ${entries.length} segments in playlist`);
     console.log(`[NoSubVod] Clip range: ${clipStart}s - ${clipEnd}s`);
     
+    const playlistUsesMp4 = entries.some(entry => entry.url.includes('.mp4')) || !!initSegmentUrl;
+    const resolvedFileFormat: 'ts' | 'mp4' = playlistUsesMp4 ? 'mp4' : 'ts';
+
+    if (fileFormat !== resolvedFileFormat) {
+      const label = resolvedFileFormat === 'mp4' ? 'MP4' : 'TS';
+      console.warn(`[NoSubVod] Playlist uses ${label} segments, forcing ${resolvedFileFormat} output for compatibility`);
+    }
+
     // Appliquer découpage temporel
     const segmentUrls: string[] = [];
     let cumTime = 0;
@@ -131,6 +148,10 @@ async function downloadVod(
         segmentUrls.push(e.url);
       }
       cumTime += e.duration;
+    }
+
+    if (initSegmentUrl && resolvedFileFormat === 'mp4') {
+      segmentUrls.unshift(initSegmentUrl);
     }
     
     console.log(`[NoSubVod] Selected ${segmentUrls.length} segments for download (total duration: ${cumTime.toFixed(1)}s)`);
@@ -470,11 +491,11 @@ async function downloadVod(
       totalBytes,
       failedCount,
       segmentCount: successfulSegments,
-      fileFormat
+      fileFormat: resolvedFileFormat
     });
     
     // Determine file extension based on format
-    const fileExtension = fileFormat === 'mp4' ? 'mp4' : 'ts';
+    const fileExtension = resolvedFileFormat === 'mp4' ? 'mp4' : 'ts';
     
     // Sanitize title for filename (remove invalid characters)
     const sanitizedTitle = (vodInfo.title || 'Untitled VOD')
@@ -490,7 +511,7 @@ async function downloadVod(
       `?downloadId=${encodeURIComponent(downloadId)}` +
       `&filename=${encodeURIComponent(filename)}` +
       `&segmentCount=${successfulSegments}` +
-      `&fileFormat=${encodeURIComponent(fileFormat)}`;
+      `&fileFormat=${encodeURIComponent(resolvedFileFormat)}`;
     
     chrome.tabs.create({ url: downloadUrl });
 

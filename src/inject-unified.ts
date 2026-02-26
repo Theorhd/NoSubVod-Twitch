@@ -20,7 +20,7 @@ function injectPageScript() {
     // On passe l'URL du patch via un attribut data-*
     const bootstrapScript = document.createElement('script');
     bootstrapScript.src = bootstrapUrl;
-    bootstrapScript.setAttribute('data-patch-url', patchUrl);
+    bootstrapScript.dataset.patchUrl = patchUrl;
     (document.head || document.documentElement).appendChild(bootstrapScript);
     
     console.log('[NSV] 🎯 Worker patch bootstrap injected');
@@ -28,7 +28,7 @@ function injectPageScript() {
     // Ensuite charger le script de page complet (asynchrone)
     const pageScript = document.createElement('script');
     pageScript.src = pageScriptUrl;
-    pageScript.setAttribute('data-patch-url', patchUrl);
+    pageScript.dataset.patchUrl = patchUrl;
     
     (document.head || document.documentElement).appendChild(pageScript);
     
@@ -56,14 +56,14 @@ async function loadChatSettings() {
           
           if (result.chatCustomization) {
             const settings = { ...result.chatCustomization };
-            if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+            if (settings.myBadgeText?.startsWith('assets/')) {
               settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
             }
-            (window as any).NSV_SETTINGS = settings;
+            (globalThis as any).NSV_SETTINGS = settings;
             console.log('[NSV] Chat settings preloaded');
             
             // Envoyer un event pour notifier que les settings sont prêts
-            window.dispatchEvent(
+            globalThis.dispatchEvent(
               new CustomEvent('NSV_SETTINGS_UPDATED', {
                 detail: settings,
               })
@@ -90,16 +90,16 @@ try {
   const _push = history.pushState;
   history.pushState = function(...args) {
     const res = _push.apply(this, args as any);
-    window.dispatchEvent(new Event('locationchange'));
+    globalThis.dispatchEvent(new Event('locationchange'));
     return res;
   };
   const _replace = history.replaceState;
   history.replaceState = function(...args) {
     const res = _replace.apply(this, args as any);
-    window.dispatchEvent(new Event('locationchange'));
+    globalThis.dispatchEvent(new Event('locationchange'));
     return res;
   };
-  window.addEventListener('popstate', () => window.dispatchEvent(new Event('locationchange')));
+  globalThis.addEventListener('popstate', () => globalThis.dispatchEvent(new Event('locationchange')));
 } catch (error) {
   console.error('[NSV] Error setting up SPA navigation:', error);
 }
@@ -117,12 +117,12 @@ try {
       if (result.chatCustomization) {
         // Convertir l'URL du badge si nécessaire (assets/ path)
         const settings = { ...result.chatCustomization };
-        if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+        if (settings.myBadgeText?.startsWith('assets/')) {
           settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
         }
         
-        (window as any).NSV_SETTINGS = settings;
-        window.dispatchEvent(
+        (globalThis as any).NSV_SETTINGS = settings;
+        globalThis.dispatchEvent(
           new CustomEvent('NSV_SETTINGS_UPDATED', {
             detail: settings,
           })
@@ -139,12 +139,12 @@ try {
       if (changes.chatCustomization) {
         // Convertir l'URL du badge si nécessaire (assets/ path)
         const settings = { ...changes.chatCustomization.newValue };
-        if (settings.myBadgeText && settings.myBadgeText.startsWith('assets/')) {
+        if (settings.myBadgeText?.startsWith('assets/')) {
           settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
         }
         
-        (window as any).NSV_SETTINGS = settings;
-        window.dispatchEvent(
+        (globalThis as any).NSV_SETTINGS = settings;
+        globalThis.dispatchEvent(
           new CustomEvent('NSV_SETTINGS_UPDATED', {
             detail: settings,
           })
@@ -153,7 +153,7 @@ try {
       }
     });
     
-    window.addEventListener('NSV_RELOAD_SETTINGS', () => {
+    globalThis.addEventListener('NSV_RELOAD_SETTINGS', () => {
       console.log('[NSV] Settings reload requested');
       loadAndSendChatSettings();
     });
@@ -170,7 +170,7 @@ try {
 // ============================================
 function initializeContentFeatures() {
   // Utiliser requestIdleCallback si disponible, sinon setTimeout
-  const scheduleInit = (window as any).requestIdleCallback || 
+  const scheduleInit = (globalThis as any).requestIdleCallback || 
     ((cb: () => void) => setTimeout(cb, 1000)); // Augmenté à 1s pour laisser la page charger
   
   scheduleInit(async () => {
@@ -184,7 +184,7 @@ function initializeContentFeatures() {
 
           const contentManager = new FeatureManager({
             context: FeatureContext.CONTENT_SCRIPT,
-            currentUrl: window.location.href,
+            currentUrl: globalThis.location.href,
             storage: new ChromeStorageAdapter()
           });
 
@@ -194,7 +194,7 @@ function initializeContentFeatures() {
           await contentManager.initializeAll();
           console.log('[NSV] Content script features initialized');
 
-          (window as any).__NSV_CONTENT_MANAGER__ = contentManager;
+          (globalThis as any).__NSV_CONTENT_MANAGER__ = contentManager;
         })(),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Content features initialization timeout')), 10000)

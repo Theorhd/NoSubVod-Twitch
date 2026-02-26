@@ -42,10 +42,17 @@ const htmlFiles = [
   { in: 'src/interfaces/offscreen.html', out: 'dist/offscreen.html' },
 ];
 
-function copyHtmlFiles() {
-  console.log('\n📄 Copying HTML files...\n');
+// CSS files to copy
+const cssFiles = [
+  { in: 'src/interfaces/styles/theme.css', out: 'dist/theme.css' },
+  { in: 'src/interfaces/styles/popup.css', out: 'dist/popup.css' },
+  { in: 'src/interfaces/styles/settings.css', out: 'dist/settings.css' },
+];
+
+function copyStaticFiles() {
+  console.log('\n📄 Copying static files...\n');
   
-  for (const file of htmlFiles) {
+  for (const file of [...htmlFiles, ...cssFiles]) {
     try {
       fs.copyFileSync(file.in, file.out);
       console.log(`✅ Copied: ${path.basename(file.out)}`);
@@ -73,7 +80,7 @@ async function buildAll() {
     }
   }
   
-  copyHtmlFiles();
+  copyStaticFiles();
   
   console.log('\n✨ Build complete!\n');
 }
@@ -93,11 +100,11 @@ async function watchAll() {
     })
   );
   
-  // Initial copy of HTML files
-  copyHtmlFiles();
+  // Initial copy of static files
+  copyStaticFiles();
   
-  // Watch HTML files for changes
-  for (const file of htmlFiles) {
+  // Watch HTML/CSS files for changes
+  for (const file of [...htmlFiles, ...cssFiles]) {
     fs.watchFile(file.in, () => {
       console.log(`\n📄 ${path.basename(file.in)} changed, copying...`);
       fs.copyFileSync(file.in, file.out);
@@ -112,8 +119,8 @@ async function watchAll() {
     console.log('\n\n🛑 Stopping watch mode...');
     await Promise.all(contexts.map(ctx => ctx.dispose()));
     
-    // Unwatch HTML files
-    for (const file of htmlFiles) {
+    // Unwatch HTML/CSS files
+    for (const file of [...htmlFiles, ...cssFiles]) {
       fs.unwatchFile(file.in);
     }
     
