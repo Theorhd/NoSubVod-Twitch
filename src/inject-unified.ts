@@ -41,49 +41,8 @@ function injectPageScript() {
 // S'exécute IMMÉDIATEMENT, même avant DOMContentLoaded
 injectPageScript();
 
-// Fonction pour charger les settings de chat de manière asynchrone
-async function loadChatSettings() {
-  try {
-    // Ajouter un timeout de sécurité pour ne pas bloquer indéfiniment
-    await Promise.race([
-      new Promise<void>((resolve) => {
-        chrome.storage.local.get('chatCustomization', (result: any) => {
-          if (chrome.runtime.lastError) {
-            console.warn('[NSV] Could not load chat settings:', chrome.runtime.lastError);
-            resolve();
-            return;
-          }
-          
-          if (result.chatCustomization) {
-            const settings = { ...result.chatCustomization };
-            if (settings.myBadgeText?.startsWith('assets/')) {
-              settings.myBadgeText = chrome.runtime.getURL(settings.myBadgeText);
-            }
-            (globalThis as any).NSV_SETTINGS = settings;
-            console.log('[NSV] Chat settings preloaded');
-            
-            // Envoyer un event pour notifier que les settings sont prêts
-            globalThis.dispatchEvent(
-              new CustomEvent('NSV_SETTINGS_UPDATED', {
-                detail: settings,
-              })
-            );
-          }
-          resolve();
-        });
-      }),
-      new Promise<void>((resolve) => setTimeout(resolve, 1000)) // Timeout 1s
-    ]);
-  } catch (error) {
-    console.warn('[NSV] Error loading chat settings:', error);
-  }
-}
-
 // Injecter le script de page
-injectPageScript();
-
-// Charger les settings de chat en arrière-plan (asynchrone)
-loadChatSettings();
+// Call removed because it's already done at the top of the file.
 
 // Gérer les changements d'URL (SPA)
 try {

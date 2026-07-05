@@ -168,7 +168,8 @@ const oldFetch = (self as any).fetch;
       const broadcastType = vodData.broadcastType.toLowerCase();
       let startBandwidth = 8534030;
 
-      for (const resKey of keys) {
+      // Optimisation : Valider toutes les qualités en parallèle
+      const qualityPromises = keys.map(async (resKey) => {
         let streamUrl: string | undefined;
         if (broadcastType === 'highlight') {
           streamUrl = `https://${domain}/${vodSpecialID}/${resKey}/highlight-${vodId}.m3u8`;
@@ -177,27 +178,31 @@ const oldFetch = (self as any).fetch;
         } else {
           streamUrl = `https://${domain}/${vodSpecialID}/${resKey}/index-dvr.m3u8`;
         }
-        if (!streamUrl) continue;
+        if (!streamUrl) return null;
         
-        // Optimisation : Valider les qualités en parallèle avec timeout
         try {
           const valid = await Promise.race([
             isValidQuality(streamUrl),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)) // Timeout 5s par qualité
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
           ]);
-          
-          if (valid) {
-            const quality = resKey === 'chunked' ? `${resolutions[resKey].res.split('x')[1]}p` : resKey;
-            const enabled = resKey === 'chunked' ? 'YES' : 'NO';
-            fakePlaylist += `
+          return { resKey, streamUrl, valid };
+        } catch {
+          return null;
+        }
+      });
+
+      const results = await Promise.all(qualityPromises);
+
+      for (const result of results) {
+        if (result && result.valid) {
+          const { resKey, streamUrl, valid } = result;
+          const quality = resKey === 'chunked' ? `${resolutions[resKey].res.split('x')[1]}p` : resKey;
+          const enabled = resKey === 'chunked' ? 'YES' : 'NO';
+          fakePlaylist += `
 #EXT-X-MEDIA:TYPE=VIDEO,GROUP-ID="${quality}",NAME="${quality}",AUTOSELECT=${enabled},DEFAULT=${enabled}
 #EXT-X-STREAM-INF:BANDWIDTH=${startBandwidth},CODECS="${valid.codec},mp4a.40.2",RESOLUTION=${resolutions[resKey].res},VIDEO="${quality}",FRAME-RATE=${resolutions[resKey].fps}
 ${streamUrl}`;
-            startBandwidth -= 100;
-          }
-        } catch (error) {
-          console.warn('[NSV] Failed to validate quality for', resKey, error);
-          // Continuer avec les autres qualités
+          startBandwidth -= 100;
         }
       }
 

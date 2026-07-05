@@ -1,8 +1,8 @@
-// Download page script - handles FileSystem Access API
+// Download page script - handles fetching, IndexedDB, and FileSystem Access API
 declare const chrome: any;
 
 import { IndexedDBHelper } from '../utils/indexed-db-helper';
-import { storage } from '../utils/storage';
+import { storage, ActiveDownload } from '../utils/storage';
 
 const dbHelper = new IndexedDBHelper();
 
@@ -15,8 +15,9 @@ const progressText = document.getElementById('progressText') as HTMLElement;
 const progressSpeed = document.getElementById('progressSpeed') as HTMLElement;
 const progressTime = document.getElementById('progressTime') as HTMLElement;
 
-// Flag to prevent duplicate completion messages
 let completionMessageSent = false;
+let isAborted = false;
+let isPaused = false;
 
 function updateStatus(message: string, type: 'info' | 'success' | 'error' = 'info') {
   statusEl.textContent = message;
@@ -37,32 +38,52 @@ function updateProgress(current: number, total: number) {
   }
 }
 
-// Get download info from URL params (parsed once)
-const params = new URLSearchParams(window.location.search);
-const downloadId = params.get('downloadId');
-const filename = params.get('filename');
-const segmentCountStr = params.get('segmentCount');
-const fileFormat = (params.get('fileFormat') || 'mp4') as 'ts' | 'mp4';
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
 
-if (!downloadId || !filename || !segmentCountStr) {
+const urlParams = new URLSearchParams(window.location.search);
+const downloadId = urlParams.get('downloadId');
+const filename = urlParams.get('filename');
+
+if (!downloadId || !filename) {
   updateStatus('❌ Paramètres manquants', 'error');
   startBtn.disabled = true;
 } else {
-  const segmentCount = parseInt(segmentCountStr);
-  const fileSizeMB = Math.round(segmentCount * 9.4); // Approximation
-  
-  // Check if compression was used
-  storage.getSettings().then(settings => {
-    const compressionNote = settings.compressVideo 
-      ? '<br><span style="color: #4caf50;">🗜️ Compression activée - taille réduite d\'environ 15%</span>' 
-      : '';
-    
+  // Load params from session storage
+  chrome.storage.session.get([`download_params_${downloadId}`], async (result: any) => {
+    const params = result[`download_params_${downloadId}`];
+    if (!params) {
+      updateStatus('❌ Impossible de charger les détails du téléchargement.', 'error');
+      startBtn.disabled = true;
+      return;
+    }
+
+    const { playlistUrl, vodInfo, qualityLabel, fileFormat, clipStart, clipEnd } = params;
+
+    const settings = await storage.getSettings();
     infoEl.innerHTML = `
       <strong>Prêt à télécharger votre VOD !</strong><br>
       Fichier : <code>${filename}</code><br>
-      Taille approximative : <strong>${fileSizeMB} MB</strong><br>
-      Segments : <strong>${segmentCount}</strong>${compressionNote}
+      Qualité : <strong>${qualityLabel}</strong><br>
     `;
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      infoEl.classList.add('hidden');
+      progressContainer.style.display = 'block';
+      progressContainer.classList.add('visible');
+      
+      try {
+        await executeFullDownload(downloadId, filename, playlistUrl, vodInfo, qualityLabel, fileFormat, clipStart, clipEnd, settings);
+      } catch (err: any) {
+        handleError(err);
+      }
+    });
   });
 }
 
@@ -80,195 +101,325 @@ async function downloadWithAnchor(blobUrl: string, filename: string, downloadId:
   console.log('[NoSubVod Download] Fallback download triggered');
   updateStatus('✅ Téléchargement démarré ! Gardez cette page ouverte.', 'success');
   
-  // Keep blob URL alive for 3 minutes
   setTimeout(() => {
     URL.revokeObjectURL(blobUrl);
     document.body.removeChild(a);
     console.log('[NoSubVod Download] Blob URL revoked');
   }, 180000);
   
-  // Clean up IndexedDB after delay
   setTimeout(async () => {
     await dbHelper.deleteDownload(downloadId, segmentCount);
     console.log('[NoSubVod Download] IndexedDB cleaned up');
     
-    // Notify background (only once)
     if (!completionMessageSent) {
       completionMessageSent = true;
       chrome.runtime.sendMessage({
         type: 'FILE_WRITE_COMPLETE',
         downloadId
       });
-      console.log('[NoSubVod Download] Completion message sent to background');
     }
     
-    // Auto-close after cleanup
     setTimeout(() => window.close(), 2000);
   }, 10000);
 }
 
-// Start download when button is clicked (user gesture required!)
-startBtn.addEventListener('click', async () => {
-  if (!downloadId || !filename || !segmentCountStr) {
-    return;
+function handleError(error: any) {
+  console.error('[NoSubVod Download] Error:', error);
+  progressContainer.style.display = 'none';
+  progressContainer.classList.remove('visible');
+  startBtn.classList.remove('hidden');
+  startBtn.disabled = false;
+  infoEl.classList.remove('hidden');
+  
+  updateStatus('❌ Erreur : ' + error.message, 'error');
+  
+  if (downloadId) {
+    chrome.runtime.sendMessage({
+      type: 'FILE_WRITE_ERROR',
+      downloadId,
+      error: error.message || 'Unknown error'
+    });
+  }
+}
+
+async function executeFullDownload(
+  downloadId: string, 
+  filename: string,
+  playlistUrl: string, 
+  vodInfo: any, 
+  qualityLabel: string, 
+  fileFormat: string, 
+  clipStart: number, 
+  clipEnd: number,
+  userSettings: any
+) {
+  updateStatus('Récupération de la playlist...');
+  
+  const resp = await fetch(playlistUrl);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const playlistText = await resp.text();
+
+  const lines = playlistText.split('\n');
+  const entries: { url: string; duration: number }[] = [];
+  let initSegmentUrl: string | null = null;
+  let lastDur = 0;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('#EXT-X-MAP')) {
+      const match = /URI="([^"]+)"/i.exec(trimmed) || /URI=([^,\\s]+)/i.exec(trimmed);
+      const rawUrl = match?.[1]?.replace(/"/g, '');
+      if (rawUrl) {
+        initSegmentUrl = rawUrl.startsWith('http')
+          ? rawUrl
+          : new URL(rawUrl, playlistUrl).toString();
+      }
+    } else if (trimmed.startsWith('#EXTINF')) {
+      lastDur = Number.parseFloat(trimmed.split(':')[1]) || 0;
+    } else if (trimmed && !trimmed.startsWith('#')) {
+      const url = trimmed.startsWith('http')
+        ? trimmed
+        : new URL(trimmed, playlistUrl).toString();
+      entries.push({ url, duration: lastDur });
+    }
+  }
+
+  const playlistUsesMp4 = entries.some(entry => entry.url.includes('.mp4')) || !!initSegmentUrl;
+  const resolvedFileFormat = playlistUsesMp4 ? 'mp4' : 'ts';
+
+  const segmentUrls: string[] = [];
+  let cumTime = 0;
+  for (const e of entries) {
+    const segStart = cumTime;
+    const segEnd = cumTime + e.duration;
+    if (segEnd > clipStart && segStart < clipEnd) {
+      segmentUrls.push(e.url);
+    }
+    cumTime += e.duration;
+  }
+
+  if (initSegmentUrl && resolvedFileFormat === 'mp4') {
+    segmentUrls.unshift(initSegmentUrl);
+  }
+
+  if (segmentUrls.length === 0) {
+    throw new Error('Aucun segment trouvé dans la plage spécifiée');
+  }
+
+  updateStatus(`Téléchargement de ${segmentUrls.length} segments...`);
+  
+  let failedCount = 0;
+  let totalBytes = 0;
+  let successfulSegments = 0;
+  const downloadStartTime = Date.now();
+  const chunkSize = userSettings.downloadChunkSize || 5;
+
+  async function downloadSegmentWithRetry(url: string, segmentIndex: number, maxRetries = 3) {
+    let is403 = false;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (isAborted) throw new Error('Téléchargement annulé');
+        
+        if (attempt > 0) {
+          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+          await new Promise(r => setTimeout(r, delay));
+        }
+
+        const segResp = await fetch(url, {
+          signal: AbortSignal.timeout(30000)
+        });
+
+        if (!segResp.ok) {
+          if (segResp.status === 403) {
+            is403 = true;
+            throw new Error(`HTTP 403`);
+          }
+          throw new Error(`HTTP ${segResp.status}`);
+        }
+
+        const buf = await segResp.arrayBuffer();
+        return { buffer: buf, is403: false };
+      } catch (err: any) {
+        if (err.message === 'Téléchargement annulé') throw err;
+        if (err.message.includes('403')) is403 = true;
+        if (attempt === maxRetries - 1 && !is403) {
+          console.warn(`Segment ${segmentIndex} failed:`, err);
+        }
+      }
+    }
+    return { buffer: null, is403 };
+  }
+
+  let consecutiveFailures = 0;
+  let total403Errors = 0;
+
+  for (let batchStart = 0; batchStart < segmentUrls.length; batchStart += chunkSize) {
+    if (isAborted) throw new Error('Téléchargement annulé');
+    
+    while (isPaused) {
+      await new Promise(r => setTimeout(r, 500));
+      if (isAborted) throw new Error('Téléchargement annulé');
+    }
+
+    if (consecutiveFailures - total403Errors >= 30) {
+      throw new Error(`Trop d'échecs réseau consécutifs.`);
+    }
+
+    const batchEnd = Math.min(batchStart + chunkSize, segmentUrls.length);
+    const batchPromises = [];
+    
+    for (let i = batchStart; i < batchEnd; i++) {
+      const p = downloadSegmentWithRetry(segmentUrls[i], i).then(async (result) => {
+        if (result.buffer) {
+          await dbHelper.storeSegment(downloadId, i, result.buffer);
+          successfulSegments++;
+          totalBytes += result.buffer.byteLength;
+          consecutiveFailures = 0;
+        } else if (result.is403) {
+          failedCount++;
+          total403Errors++;
+          consecutiveFailures++;
+        } else {
+          failedCount++;
+          consecutiveFailures++;
+        }
+      });
+      batchPromises.push(p);
+    }
+
+    await Promise.all(batchPromises);
+
+    updateProgress(successfulSegments, segmentUrls.length);
+    if (progressSpeed) {
+      progressSpeed.textContent = `${successfulSegments}/${segmentUrls.length} segments`;
+    }
+    
+    // Update active download state to notify UI
+    const progressPercent = Math.round((successfulSegments / segmentUrls.length) * 100);
+    const elapsed = (Date.now() - downloadStartTime) / 1000;
+    const speed = elapsed > 0 ? totalBytes / elapsed : 0;
+    
+    const ad = await storage.getActiveDownload();
+    if (ad && ad.downloadId === downloadId) {
+      ad.progress = {
+        percent: progressPercent,
+        current: successfulSegments,
+        total: segmentUrls.length,
+        speed,
+        downloadedBytes: totalBytes
+      };
+      await storage.setActiveDownload(ad);
+    }
+  }
+
+  if (successfulSegments === 0) {
+    throw new Error('Aucun segment n\'a pu être téléchargé.');
+  }
+
+  updateStatus('Création du fichier final...');
+
+  // Load and concatenate segments in batches
+  const BATCH_SIZE = 100;
+  const blobParts: Blob[] = [];
+  
+  for (let batchStart = 0; batchStart < segmentUrls.length; batchStart += BATCH_SIZE) {
+    const batchEnd = Math.min(batchStart + BATCH_SIZE, segmentUrls.length);
+    const batchBuffers: ArrayBuffer[] = [];
+    
+    for (let i = batchStart; i < batchEnd; i++) {
+      const segment = await dbHelper.getSegment(downloadId, i);
+      if (segment) {
+        batchBuffers.push(segment);
+      }
+    }
+    
+    if (batchBuffers.length > 0) {
+      const batchBlob = new Blob(batchBuffers, { type: resolvedFileFormat === 'mp4' ? 'video/mp4' : 'video/mp2t' });
+      blobParts.push(batchBlob);
+    }
+  }
+
+  const mimeType = resolvedFileFormat === 'mp4' ? 'video/mp4' : 'video/mp2t';
+  const blob = new Blob(blobParts, { type: mimeType });
+  const blobUrl = URL.createObjectURL(blob);
+
+  updateStatus('Démarrage de la sauvegarde...', 'success');
+
+  try {
+    const chromeDownloadId = await new Promise<number>((resolve, reject) => {
+      chrome.downloads.download({
+        url: blobUrl,
+        filename: filename,
+        saveAs: true
+      }, (id: number) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(id);
+        }
+      });
+    });
+
+    const checkInterval = setInterval(() => {
+      chrome.downloads.search({ id: chromeDownloadId }, async (downloads: any[]) => {
+        if (downloads.length > 0) {
+          const dl = downloads[0];
+          if (dl.state === 'complete') {
+            clearInterval(checkInterval);
+            URL.revokeObjectURL(blobUrl);
+            await cleanupAndComplete(downloadId, segmentUrls.length, vodInfo, qualityLabel, totalBytes, failedCount, resolvedFileFormat);
+          } else if (dl.state === 'interrupted') {
+            clearInterval(checkInterval);
+            downloadWithAnchor(blobUrl, filename, downloadId, segmentUrls.length);
+          }
+        }
+      });
+    }, 1000);
+  } catch (error: any) {
+    downloadWithAnchor(blobUrl, filename, downloadId, segmentUrls.length);
+  }
+}
+
+async function cleanupAndComplete(downloadId: string, segmentCount: number, vodInfo: any, qualityLabel: string, totalBytes: number, failedCount: number, format: string) {
+  updateStatus('✅ Téléchargement terminé !', 'success');
+  await dbHelper.deleteDownload(downloadId, segmentCount);
+  
+  if (!completionMessageSent) {
+    completionMessageSent = true;
+    
+    // Pass metadata back to background
+    const settings = await storage.getSettings();
+    const thumbnail = settings.showThumbnails ? (vodInfo.previewThumbnailURL || '') : '';
+
+    chrome.runtime.sendMessage({
+      type: 'FILE_WRITE_COMPLETE',
+      downloadId,
+      metadata: {
+        vodInfo,
+        qualityLabel,
+        thumbnail,
+        totalBytes,
+        failedCount,
+        segmentCount,
+        fileFormat: format
+      }
+    });
   }
   
-  const segmentCount = parseInt(segmentCountStr);
-  
-  try {
-    startBtn.disabled = true;
-    updateStatus('Chargement des segments...');
-    infoEl.classList.add('hidden');
-    progressContainer.style.display = 'block';
-    progressContainer.classList.add('visible');
-    
-    // Load and concatenate segments in batches to avoid memory overflow
-    const BATCH_SIZE = 100; // Process 100 segments at a time
-    const blobParts: Blob[] = [];
-    
-    for (let batchStart = 0; batchStart < segmentCount; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, segmentCount);
-      const batchBuffers: ArrayBuffer[] = [];
-      
-      // Load one batch
-      for (let i = batchStart; i < batchEnd; i++) {
-        const segment = await dbHelper.getSegment(downloadId, i);
-        
-        if (!segment) {
-          console.warn(`[NoSubVod Download] Segment ${i} not found, skipping`);
-          continue;
-        }
-        
-        batchBuffers.push(segment);
-        
-        updateProgress(i + 1, segmentCount);
-        
-        if ((i + 1) % 50 === 0 || i === segmentCount - 1) {
-          console.log(`[NoSubVod Download] Loaded ${i + 1}/${segmentCount} segments`);
-          if (progressSpeed) {
-            progressSpeed.textContent = `${i + 1}/${segmentCount} segments`;
-          }
-        }
-      }
-      
-      // Create a blob for this batch and add it to parts
-      if (batchBuffers.length > 0) {
-        const batchBlob = new Blob(batchBuffers, { type: fileFormat === 'mp4' ? 'video/mp4' : 'video/mp2t' });
-        blobParts.push(batchBlob);
-        console.log(`[NoSubVod Download] Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} processed`);
-      }
-    }
-    
-    updateStatus('Création du fichier...');
-    
-    // Determine MIME type based on format
-    const mimeType = fileFormat === 'mp4' ? 'video/mp4' : 'video/mp2t';
-    
-    // Create final blob from all batch blobs
-    const blob = new Blob(blobParts, { type: mimeType });
-    console.log(`[NoSubVod Download] Final blob created (${fileFormat}), size: ${blob.size}`);
-    
-    updateStatus('Préparation du téléchargement...');
-    
-    // Create blob URL
-    const blobUrl = URL.createObjectURL(blob);
-    console.log(`[NoSubVod Download] Blob URL created: ${blobUrl}`);
-    
-    updateStatus('Démarrage du téléchargement...');
-    
-    // Try chrome.downloads first (shows in downloads bar)
-    try {
-      const chromeDownloadId = await new Promise<number>((resolve, reject) => {
-        chrome.downloads.download({
-          url: blobUrl,
-          filename: filename,
-          saveAs: true
-        }, (id: number) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else {
-            resolve(id);
-          }
-        });
-      });
-      
-      console.log('[NoSubVod Download] Chrome download started with ID:', chromeDownloadId);
-      updateStatus('✅ Téléchargement démarré ! Ne fermez pas cette page.', 'success');
-      
-      // Monitor download progress
-      const checkInterval = setInterval(() => {
-        chrome.downloads.search({ id: chromeDownloadId }, async (downloads: any[]) => {
-          if (downloads.length > 0) {
-            const dl = downloads[0];
-            
-            if (dl.state === 'complete') {
-              clearInterval(checkInterval);
-              console.log('[NoSubVod Download] Download completed successfully');
-              URL.revokeObjectURL(blobUrl);
-              updateStatus('✅ Téléchargement terminé !', 'success');
-              
-              // Clean up IndexedDB
-              await dbHelper.deleteDownload(downloadId, segmentCount);
-              console.log('[NoSubVod Download] IndexedDB cleaned up');
-              
-              // Notify background (only once)
-              if (!completionMessageSent) {
-                completionMessageSent = true;
-                chrome.runtime.sendMessage({
-                  type: 'FILE_WRITE_COMPLETE',
-                  downloadId
-                });
-                console.log('[NoSubVod Download] Completion message sent to background');
-              }
-              
-              setTimeout(() => window.close(), 2000);
-            } else if (dl.state === 'interrupted') {
-              clearInterval(checkInterval);
-              console.error('[NoSubVod Download] Download interrupted:', dl.error);
-              
-              // Fallback to <a download> method
-              console.log('[NoSubVod Download] Trying fallback method...');
-              downloadWithAnchor(blobUrl, filename, downloadId, segmentCount);
-            }
-          }
-        });
-      }, 1000);
-      
-    } catch (error: any) {
-      console.error('[NoSubVod Download] chrome.downloads failed:', error);
-      console.log('[NoSubVod Download] Using fallback method...');
-      
-      // Fallback to <a download>
-      downloadWithAnchor(blobUrl, filename, downloadId, segmentCount);
-    }
-    
-  } catch (error: any) {
-    console.error('[NoSubVod Download] Error:', error);
-    
-    progressContainer.style.display = 'none';
-    progressContainer.classList.remove('visible');
-    startBtn.classList.remove('hidden');
-    startBtn.disabled = false;
-    infoEl.classList.remove('hidden');
-    
-    updateStatus('❌ Erreur : ' + error.message, 'error');
-    
-    if (downloadId && segmentCountStr) {
-      // Clean up IndexedDB even on error
-      try {
-        await dbHelper.deleteDownload(downloadId, parseInt(segmentCountStr));
-      } catch (cleanupError) {
-        console.error('[NoSubVod Download] Cleanup error:', cleanupError);
-      }
-      
-      // Notify background script of error
-      chrome.runtime.sendMessage({
-        type: 'FILE_WRITE_ERROR',
-        downloadId,
-        error: error.message || 'Unknown error'
-      });
-      console.log('[NoSubVod Download] Error message sent to background');
-    }
+  setTimeout(() => window.close(), 3000);
+}
+
+chrome.runtime.onMessage.addListener((request: any, sender: any, sendResponse: (response: any) => void) => {
+  if (request.action === 'cancelDownload' && request.downloadId === downloadId) {
+    isAborted = true;
+    sendResponse({ success: true });
+  }
+  if (request.action === 'pauseDownload' && request.downloadId === downloadId) {
+    isPaused = true;
+    sendResponse({ success: true });
+  }
+  if (request.action === 'resumeDownload' && request.downloadId === downloadId) {
+    isPaused = false;
+    sendResponse({ success: true });
   }
 });
-

@@ -31,6 +31,13 @@ export class FeatureManager {
     this.config = config;
   }
 
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs))
+    ]);
+  }
+
   /**
    * Enregistre une nouvelle feature
    */
@@ -101,10 +108,7 @@ export class FeatureManager {
     // Avec timeout pour ne pas bloquer
     if (this.config.storage) {
       try {
-        await Promise.race([
-          this.loadFeatureSettings(),
-          new Promise(resolve => setTimeout(resolve, 2000)) // Timeout 2s
-        ]);
+        await this.withTimeout(this.loadFeatureSettings(), 2000, 'Storage load timeout');
       } catch (error) {
         console.warn('[NSV] Storage load timeout or error:', error);
       }
@@ -113,19 +117,14 @@ export class FeatureManager {
     // Résoudre les dépendances et initialiser dans l'ordre
     const orderedFeatures = this.resolveDependencies();
     
-    // Initialiser les features en parallèle par groupes (non dépendantes)
-    // mais avec timeout individuel pour éviter qu'une feature bloque tout
+    // Initialiser les features
     for (const feature of orderedFeatures) {
       try {
-        await Promise.race([
-          feature.initialize(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Feature initialization timeout')), 5000)
-          )
-        ]);
+        await this.withTimeout(feature.initialize(), 5000, `Feature initialization timeout`);
       } catch (error) {
         console.error(`[NSV] Failed to initialize feature ${feature.getId()}:`, error);
-        // Continuer avec les autres features
+        // Forcer la désactivation en cas d'échec critique
+        feature.setEnabled(false);
       }
     }
 
